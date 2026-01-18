@@ -11,10 +11,10 @@ import { trpcClient } from "../../../lib/trpc"
 import {
   askUserQuestionResultsAtom,
   compactingSubChatsAtom,
-  lastSelectedModelIdAtom,
-  MODEL_ID_MAP,
   pendingAuthRetryMessageAtom,
   pendingUserQuestionsAtom,
+  selectedProviderAtom,
+  selectedModelAtom,
 } from "../atoms"
 import { useAgentSubChatStore } from "../stores/sub-chat-store"
 
@@ -127,9 +127,9 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
     const thinkingEnabled = appStore.get(extendedThinkingEnabledAtom)
     const maxThinkingTokens = thinkingEnabled ? 128_000 : undefined
 
-    // Read model selection dynamically (so model changes apply to existing chats)
-    const selectedModelId = appStore.get(lastSelectedModelIdAtom)
-    const modelString = MODEL_ID_MAP[selectedModelId]
+    // Read provider/model selection dynamically (so changes apply to existing chats)
+    const selectedProvider = appStore.get(selectedProviderAtom)
+    const selectedModel = appStore.get(selectedModelAtom)
 
     const currentMode =
       useAgentSubChatStore
@@ -145,7 +145,8 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
 
     return new ReadableStream({
       start: (controller) => {
-        const sub = trpcClient.claude.chat.subscribe(
+        // Use OpenCode router for multi-provider support
+        const sub = trpcClient.opencode.chat.subscribe(
           {
             subChatId: this.config.subChatId,
             chatId: this.config.chatId,
@@ -154,12 +155,15 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
             projectPath: this.config.projectPath, // Original project path for MCP config lookup
             mode: currentMode,
             sessionId,
-            ...(maxThinkingTokens && { maxThinkingTokens }),
-            ...(modelString && { model: modelString }),
+            // OpenCode provider/model selection
+            provider: selectedProvider,
+            model: selectedModel,
             ...(images.length > 0 && { images }),
           },
           {
             onData: (chunk: UIMessageChunk) => {
+              // DEBUG: Log every chunk received in renderer
+              console.log(`[SD] R:CHUNK sub=${subId} type=${chunk.type}`, chunk)
               chunkCount++
               lastChunkType = chunk.type
 
@@ -353,13 +357,22 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
         options.abortSignal?.addEventListener("abort", () => {
           console.log(`[SD] R:ABORT sub=${subId} n=${chunkCount} last=${lastChunkType}`)
           sub.unsubscribe()
-          trpcClient.claude.cancel.mutate({ subChatId: this.config.subChatId })
+          trpcClient.opencode.cancel.mutate({ subChatId: this.config.subChatId })
           try {
             controller.close()
           } catch {
             // Already closed
           }
         })
+      },
+      // Track when the consumer cancels the stream
+      cancel: (reason) => {
+        console.log(`[SD] R:CANCEL sub=${subId} n=${chunkCount} last=${lastChunkType} reason=${reason}`)
+      },
+      // Track when stream is pulled (consumer requests more data)
+      pull: () => {
+        // This is called when consumer wants more data - not logging every pull as it's too noisy
+        // console.log(`[SD] R:PULL sub=${subId}`)
       },
     })
   }

@@ -191,12 +191,29 @@ export const isPlanModeAtom = atomWithStorage<boolean>(
   { getOnInit: true },
 )
 
-// Model ID to full Claude model string mapping
+// Model ID to full Claude model string mapping (legacy - kept for backward compatibility)
 export const MODEL_ID_MAP: Record<string, string> = {
   opus: "opus",
   sonnet: "sonnet",
   haiku: "haiku",
 }
+
+// OpenCode provider/model selection
+// Provider ID (e.g., "azure-cognitive-services", "anthropic", "openai")
+export const selectedProviderAtom = atomWithStorage<string>(
+  "agents:selectedProvider",
+  "azure-cognitive-services", // Default to Azure for your setup
+  undefined,
+  { getOnInit: true },
+)
+
+// Model ID within the selected provider (e.g., "claude-opus-4-5", "claude-sonnet-4-5")
+export const selectedModelAtom = atomWithStorage<string>(
+  "agents:selectedModel",
+  "claude-opus-4-5", // Default to Opus
+  undefined,
+  { getOnInit: true },
+)
 
 // Sidebar state
 export const agentsSidebarOpenAtom = atomWithStorage<boolean>(

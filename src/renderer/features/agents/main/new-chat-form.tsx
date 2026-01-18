@@ -35,12 +35,13 @@ import {
   justCreatedIdsAtom,
   lastSelectedAgentIdAtom,
   lastSelectedBranchesAtom,
-  lastSelectedModelIdAtom,
   lastSelectedRepoAtom,
   lastSelectedWorkModeAtom,
   selectedAgentChatIdAtom,
   selectedDraftIdAtom,
   selectedProjectAtom,
+  selectedProviderAtom,
+  selectedModelAtom,
 } from "../atoms"
 import { ProjectSelector } from "../components/project-selector"
 import { WorkModeSelector } from "../components/work-mode-selector"
@@ -98,12 +99,15 @@ const CodexIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 )
 
-// Model options for Claude Code
-const claudeModels = [
-  { id: "opus", name: "Opus" },
-  { id: "sonnet", name: "Sonnet" },
-  { id: "haiku", name: "Haiku" },
-]
+// Model display helper
+function getModelDisplayName(modelId: string): string {
+  // Extract readable name from model ID
+  if (modelId.includes("opus")) return "Opus"
+  if (modelId.includes("sonnet")) return "Sonnet"
+  if (modelId.includes("haiku")) return "Haiku"
+  // For other models, just capitalize
+  return modelId.split("-").map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(" ")
+}
 
 // Agent providers
 const agents = [
@@ -162,9 +166,13 @@ export function NewChatForm({
   const [lastSelectedAgentId, setLastSelectedAgentId] = useAtom(
     lastSelectedAgentIdAtom,
   )
-  const [lastSelectedModelId, setLastSelectedModelId] = useAtom(
-    lastSelectedModelIdAtom,
-  )
+  // OpenCode provider/model selection
+  const [selectedProvider, setSelectedProvider] = useAtom(selectedProviderAtom)
+  const [selectedModel, setSelectedModel] = useAtom(selectedModelAtom)
+  
+  // Fetch available providers from OpenCode server
+  const { data: providersData } = trpc.opencode.providers.useQuery()
+  
   const [isPlanMode, setIsPlanMode] = useAtom(isPlanModeAtom)
   const [workMode, setWorkMode] = useAtom(lastSelectedWorkModeAtom)
   const debugMode = useAtomValue(agentsDebugModeAtom)
@@ -181,10 +189,6 @@ export function NewChatForm({
   }
   const [selectedAgent, setSelectedAgent] = useState(
     () => agents.find((a) => a.id === lastSelectedAgentId) || agents[0],
-  )
-  const [selectedModel, setSelectedModel] = useState(
-    () =>
-      claudeModels.find((m) => m.id === lastSelectedModelId) || claudeModels[1],
   )
   const [repoPopoverOpen, setRepoPopoverOpen] = useState(false)
   const [branchPopoverOpen, setBranchPopoverOpen] = useState(false)
@@ -1186,48 +1190,57 @@ export function NewChatForm({
                           )}
                       </DropdownMenu>
 
-                      {/* Model selector */}
+                      {/* Model selector - dynamic from OpenCode providers */}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button className="flex items-center gap-1.5 px-2 py-1 text-sm text-muted-foreground hover:text-foreground transition-[background-color,color] duration-150 ease-out rounded-md hover:bg-muted/50 outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/70">
                             <ClaudeCodeIcon className="h-3.5 w-3.5" />
-                            <span>
-                              {selectedModel?.name}{" "}
-                              <span className="text-muted-foreground">4.5</span>
-                            </span>
+                            <span>{getModelDisplayName(selectedModel)}</span>
                             <IconChevronDown className="h-3 w-3 shrink-0 opacity-50" />
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
                           align="start"
-                          className="w-[150px]"
+                          className="w-[280px] max-h-[400px] overflow-y-auto"
                         >
-                          {claudeModels.map((model) => {
-                            const isSelected = selectedModel?.id === model.id
+                          {providersData?.providers.map((provider) => {
+                            const modelEntries = Object.entries(provider.models || {})
+                            if (modelEntries.length === 0) return null
+                            
                             return (
-                              <DropdownMenuItem
-                                key={model.id}
-                                onClick={() => {
-                                  setSelectedModel(model)
-                                  setLastSelectedModelId(model.id)
-                                }}
-                                className="gap-2 justify-between"
-                              >
-                                <div className="flex items-center gap-1.5">
-                                  <ClaudeCodeIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                  <span>
-                                    {model.name}{" "}
-                                    <span className="text-muted-foreground">
-                                      4.5
-                                    </span>
-                                  </span>
+                              <div key={provider.id}>
+                                {/* Provider header */}
+                                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                                  {provider.name}
                                 </div>
-                                {isSelected && (
-                                  <CheckIcon className="h-3.5 w-3.5 shrink-0" />
-                                )}
-                              </DropdownMenuItem>
+                                {/* Models for this provider */}
+                                {modelEntries.map(([modelId, model]) => {
+                                  const isSelected = selectedProvider === provider.id && selectedModel === modelId
+                                  return (
+                                    <DropdownMenuItem
+                                      key={`${provider.id}:${modelId}`}
+                                      onClick={() => {
+                                        setSelectedProvider(provider.id)
+                                        setSelectedModel(modelId)
+                                      }}
+                                      className="gap-2 justify-between pl-4"
+                                    >
+                                      <span className="truncate">{model.name || getModelDisplayName(modelId)}</span>
+                                      {isSelected && (
+                                        <CheckIcon className="h-3.5 w-3.5 shrink-0" />
+                                      )}
+                                    </DropdownMenuItem>
+                                  )
+                                })}
+                              </div>
                             )
                           })}
+                          {/* Fallback if no providers loaded */}
+                          {(!providersData?.providers || providersData.providers.length === 0) && (
+                            <DropdownMenuItem disabled>
+                              <span className="text-muted-foreground">No connected providers</span>
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

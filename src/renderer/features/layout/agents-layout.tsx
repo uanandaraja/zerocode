@@ -241,7 +241,7 @@ export function AgentsLayout() {
           style={{ borderRightWidth: "0.5px" }}
         >
           <AgentsSidebar
-            desktopUser={desktopUser}
+            desktopUser={desktopUser || undefined}
             onSignOut={handleSignOut}
             onToggleSidebar={handleCloseSidebar}
           />

@@ -4,6 +4,7 @@ import { createServer } from "http"
 import { readFileSync, existsSync, unlinkSync, readlinkSync } from "fs"
 import * as Sentry from "@sentry/electron/main"
 import { initDatabase, closeDatabase } from "./lib/db"
+import { serverManager } from "./lib/opencode"
 import { createMainWindow, getWindow, showLoginPage } from "./windows/main"
 import { AuthManager } from "./auth-manager"
 import {
@@ -618,6 +619,15 @@ if (gotTheLock) {
       console.error("[App] Failed to initialize database:", error)
     }
 
+    // Initialize OpenCode server (multi-provider AI backend)
+    try {
+      await serverManager.start()
+      console.log("[App] OpenCode server started")
+    } catch (error) {
+      console.error("[App] Failed to start OpenCode server:", error)
+      // Non-fatal - app can still work with Claude SDK fallback
+    }
+
     // Create main window
     createMainWindow()
 
@@ -658,6 +668,7 @@ if (gotTheLock) {
   // Cleanup before quit
   app.on("before-quit", async () => {
     console.log("[App] Shutting down...")
+    await serverManager.shutdown()
     await shutdownAnalytics()
     await closeDatabase()
   })
