@@ -54,6 +54,48 @@ const useIsHydrated = () => true // Desktop is always hydrated
 import { cn } from "../../../lib/utils"
 import { api } from "../../../lib/api-bridge"
 import { trpcClient } from "../../../lib/trpc"
+import { useShikiTheme } from "../../../lib/themes/theme-provider"
+
+/**
+ * Map custom theme IDs to Shiki bundled themes that Pierre supports
+ * Pierre only supports Shiki's bundled themes, so we need to map our custom themes
+ */
+const PIERRE_THEME_MAP: Record<string, string> = {
+  // 21st themes → GitHub
+  "21st-dark": "github-dark",
+  "21st-light": "github-light",
+  // OpenCode themes → GitHub
+  "opencode-dark": "github-dark",
+  "opencode-light": "github-light",
+  // Claude themes → GitHub
+  "claude-dark": "github-dark",
+  "claude-light": "github-light",
+  // Cursor themes → GitHub (Cursor themes have custom tokenColors but Pierre can't use them)
+  "cursor-dark": "github-dark",
+  "cursor-light": "github-light",
+  "cursor-midnight": "github-dark",
+  // Direct mappings for themes Pierre/Shiki supports natively
+  "vesper-dark": "vesper",
+  "vesper": "vesper",
+  "vitesse-dark": "vitesse-dark",
+  "vitesse-light": "vitesse-light",
+  "min-dark": "min-dark",
+  "min-light": "min-light",
+  "github-dark": "github-dark",
+  "github-light": "github-light",
+}
+
+/**
+ * Get a Pierre-compatible theme name from our theme ID
+ * Falls back to github-dark/light if theme is not mapped
+ */
+function getPierreTheme(themeId: string, isDark: boolean): string {
+  if (themeId in PIERRE_THEME_MAP) {
+    return PIERRE_THEME_MAP[themeId]
+  }
+  // Fallback based on light/dark mode
+  return isDark ? "github-dark" : "github-light"
+}
 
 // Error Boundary for DiffView to catch parsing errors
 interface DiffErrorBoundaryProps {
@@ -260,6 +302,7 @@ interface FileDiffCardProps {
   hasContent: boolean
   isLoadingContent: boolean
   diffMode: DiffModeEnum
+  shikiTheme: string
 }
 
 // Custom comparator to prevent unnecessary re-renders
@@ -276,6 +319,7 @@ const fileDiffCardAreEqual = (
   if (prev.isLoadingContent !== next.isLoadingContent) return false
   if (prev.diffMode !== next.diffMode) return false
   if (prev.isLight !== next.isLight) return false
+  if (prev.shikiTheme !== next.shikiTheme) return false
   return true
 }
 
@@ -289,6 +333,7 @@ const FileDiffCard = memo(function FileDiffCard({
   hasContent,
   isLoadingContent,
   diffMode,
+  shikiTheme,
 }: FileDiffCardProps) {
   const diffCardRef = useRef<HTMLDivElement>(null)
 
@@ -471,9 +516,7 @@ const FileDiffCard = memo(function FileDiffCard({
                 <PatchDiff
                   patch={file.diffText}
                   options={{
-                    theme: isLight
-                      ? { light: "github-light", dark: "github-dark" }
-                      : { light: "github-light", dark: "github-dark" },
+                    theme: getPierreTheme(shikiTheme, !isLight),
                     themeType: isLight ? "light" : "dark",
                     diffStyle:
                       diffMode === DiffModeEnum.Split ? "split" : "unified",
@@ -559,6 +602,7 @@ export const AgentDiffView = forwardRef<AgentDiffViewRef, AgentDiffViewProps>(
   ) {
     const { resolvedTheme } = useTheme()
     const isHydrated = useIsHydrated()
+    const shikiTheme = useShikiTheme()
 
     const [diff, setDiff] = useState<string | null>(initialDiff ?? null)
     // Loading if initialDiff not provided, or if it's null AND no parsed files (parent still loading)
@@ -1253,6 +1297,7 @@ export const AgentDiffView = forwardRef<AgentDiffViewRef, AgentDiffViewProps>(
                         hasContent={!!fileContents[file.key]}
                         isLoadingContent={isLoadingFileContents}
                         diffMode={diffMode}
+                        shikiTheme={shikiTheme}
                       />
                     </div>
                   </div>
