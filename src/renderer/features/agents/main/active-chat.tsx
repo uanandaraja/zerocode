@@ -79,7 +79,7 @@ import { trackMessageSent } from "../../../lib/analytics"
 import { apiFetch } from "../../../lib/api-fetch"
 import { soundNotificationsEnabledAtom } from "../../../lib/atoms"
 import { appStore } from "../../../lib/jotai-store"
-import { api } from "../../../lib/mock-api"
+import { api } from "../../../lib/api-bridge"
 import { trpc, trpcClient } from "../../../lib/trpc"
 import { getQueryClient } from "../../../contexts/TRPCProvider"
 import { cn } from "../../../lib/utils"
@@ -975,7 +975,7 @@ function ChatViewInner({
         // Revert on error (toast shown by mutation onError)
         useAgentSubChatStore
           .getState()
-          .updateSubChatName(subChatId, subChatNameRef.current || "New Chat")
+          .updateSubChatName(subChatId, subChatNameRef.current || "New Session")
       }
     },
     [subChatId],
@@ -1583,16 +1583,8 @@ function ChatViewInner({
     ) {
       hasTriggeredAutoGenerateRef.current = true
       // Trigger rename for pre-populated initial message (from createAgentChat)
-      if (!hasTriggeredRenameRef.current && isFirstSubChat) {
-        const firstMsg = messages[0]
-        if (firstMsg?.role === "user") {
-          const textPart = firstMsg.parts?.find((p: any) => p.type === "text")
-          if (textPart && "text" in textPart) {
-            hasTriggeredRenameRef.current = true
-            onAutoRename(textPart.text, subChatId)
-          }
-        }
-      }
+      // Auto-rename is now handled by OpenCode via session-title events
+      // No need to trigger manual rename here
       regenerate()
     }
   }, [
@@ -1864,11 +1856,8 @@ function ChatViewInner({
       mode: isPlanModeRef.current ? "plan" : "agent",
     })
 
-    // Trigger auto-rename on first message in a new sub-chat
-    if (messagesLengthRef.current === 0 && !hasTriggeredRenameRef.current) {
-      hasTriggeredRenameRef.current = true
-      onAutoRename(text || "Image message", subChatId)
-    }
+    // Auto-rename is now handled by OpenCode via session-title events
+    // No need to trigger manual rename here
 
     // Build message parts: images first, then files, then text
     // Include base64Data for API transmission
@@ -2090,7 +2079,7 @@ function ChatViewInner({
         >
           <ChatTitleEditor
             name={subChatName}
-            placeholder="New Chat"
+            placeholder="New Session"
             onSave={handleRenameSubChat}
             isMobile={false}
             chatId={subChatId}
@@ -2795,7 +2784,7 @@ export function ChatView({
           : sc.updated_at?.toISOString()
       return {
         id: sc.id,
-        name: sc.name || "New Chat",
+        name: sc.name || "New Session",
         // Prefer DB timestamp, fall back to local timestamp, then current time
         created_at:
           createdAt ?? existingLocal?.created_at ?? new Date().toISOString(),
@@ -2818,7 +2807,7 @@ export function ChatView({
       if (!dbSubChatIds.has(id)) {
         allSubChats.push({
           id,
-          name: "New Chat",
+          name: "New Session",
           created_at: new Date().toISOString(),
         })
       }
@@ -2979,7 +2968,7 @@ export function ChatView({
     // Create sub-chat in DB first to get the real ID
     const newSubChat = await trpcClient.chats.createSubChat.mutate({
       chatId,
-      name: "New Chat",
+      name: "New Session",
       mode: subChatMode,
     })
     const newId = newSubChat.id
@@ -2990,7 +2979,7 @@ export function ChatView({
     // Add to allSubChats with placeholder name
     store.addToAllSubChats({
       id: newId,
-      name: "New Chat",
+      name: "New Session",
       created_at: new Date().toISOString(),
       mode: subChatMode,
     })

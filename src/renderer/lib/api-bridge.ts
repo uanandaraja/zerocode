@@ -17,11 +17,15 @@ type AnyObj = Record<string, any>
  */
 async function loadMessagesFromOpenCode(
   subChats: AnyObj[],
+  chatWorktreePath: string | undefined,
   projectPath: string | undefined,
 ): Promise<Map<string, AnyObj[]>> {
   const messagesMap = new Map<string, AnyObj[]>()
   
-  if (!projectPath) return messagesMap
+  // Use worktree path if available (sessions are tied to the directory they were created in)
+  // Fall back to project path
+  const directory = chatWorktreePath || projectPath
+  if (!directory) return messagesMap
   
   // Load messages for each subChat that has a sessionId
   const promises = subChats
@@ -30,7 +34,7 @@ async function loadMessagesFromOpenCode(
       try {
         const result = await trpcClient.opencode.getSessionMessages.query({
           sessionId: sc.sessionId,
-          directory: projectPath,
+          directory,
         })
         if (result.messages && result.messages.length > 0) {
           messagesMap.set(sc.id, result.messages)
@@ -118,16 +122,23 @@ export const api = {
         
         // Load messages from OpenCode when chat data is available
         useEffect(() => {
-          if (!result.data?.subChats || !result.data?.project?.path) return
+          if (!result.data?.subChats) return
+          // Need either worktreePath or project.path to fetch messages
+          if (!result.data?.worktreePath && !result.data?.project?.path) return
           
           const subChatsWithSessions = result.data.subChats.filter((sc: AnyObj) => sc.sessionId)
           if (subChatsWithSessions.length === 0) return
           
           setIsLoadingOpenCode(true)
-          loadMessagesFromOpenCode(result.data.subChats, result.data.project.path)
+          // Use worktreePath first (sessions are created in worktree dir), fall back to project path
+          loadMessagesFromOpenCode(
+            result.data.subChats,
+            result.data.worktreePath ?? undefined,
+            result.data.project?.path
+          )
             .then(setOpenCodeMessages)
             .finally(() => setIsLoadingOpenCode(false))
-        }, [result.data?.subChats, result.data?.project?.path])
+        }, [result.data?.subChats, result.data?.worktreePath, result.data?.project?.path])
 
         // Memoize transformation to prevent infinite re-renders
         const transformedData = useMemo(() => {

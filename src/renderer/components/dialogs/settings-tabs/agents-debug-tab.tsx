@@ -76,7 +76,7 @@ export function AgentsDebugTab() {
   // Mutations
   const clearChatsMutation = trpc.debug.clearChats.useMutation({
     onSuccess: () => {
-      toast.success("All chats cleared")
+      toast.success("All workspaces cleared")
       refetchDb()
     },
     onError: (error) => toast.error(error.message),

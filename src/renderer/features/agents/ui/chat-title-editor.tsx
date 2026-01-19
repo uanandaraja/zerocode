@@ -33,7 +33,7 @@ function areTitlePropsEqual(
 
 export const ChatTitleEditor = memo(function ChatTitleEditor({
   name,
-  placeholder = "New Chat",
+  placeholder = "New Session",
   onSave,
   isMobile = false,
   disabled = false,

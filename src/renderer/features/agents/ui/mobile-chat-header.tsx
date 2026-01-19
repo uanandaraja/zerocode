@@ -133,13 +133,13 @@ export function MobileChatHeader({
         onOpenChange={setIsHistoryOpen}
         items={sortedSubChats}
         onSelect={handleSelectFromHistory}
-        placeholder="Search chats..."
+        placeholder="Search sessions..."
         emptyMessage="No results"
         align="start"
         side="bottom"
         sideOffset={8}
         getItemValue={(subChat) =>
-          `${subChat.name || "New Chat"} ${subChat.id}`
+          `${subChat.name || "New Session"} ${subChat.id}`
         }
         renderItem={(subChat) => {
           const timeAgo = formatTimeAgo(
@@ -154,7 +154,7 @@ export function MobileChatHeader({
               )}
             >
               <span className="text-sm truncate">
-                {subChat.name || "New Chat"}
+                {subChat.name || "New Session"}
               </span>
               <span className="text-sm text-muted-foreground whitespace-nowrap">
                 {timeAgo}
@@ -189,7 +189,7 @@ export function MobileChatHeader({
 
               {/* Name */}
               <span className="truncate text-left">
-                {activeSubChat?.name || "New Chat"}
+                {activeSubChat?.name || "New Session"}
               </span>
 
               {/* Chevron */}

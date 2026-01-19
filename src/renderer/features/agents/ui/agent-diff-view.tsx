@@ -47,7 +47,7 @@ import {
 // import { useIsHydrated } from "@/hooks/use-is-hydrated"
 const useIsHydrated = () => true // Desktop is always hydrated
 import { cn } from "../../../lib/utils"
-import { api } from "../../../lib/mock-api"
+import { api } from "../../../lib/api-bridge"
 import { trpcClient } from "../../../lib/trpc"
 import {
   getDiffHighlighter,

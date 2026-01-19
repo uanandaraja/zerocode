@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { router, publicProcedure } from "../index"
-import { getDatabase, chats, subChats, projects } from "../../db"
+import { getDatabase, workspaces, sessions, projects, chats, subChats } from "../../db"
 import { eq, desc, isNull, isNotNull, inArray, and } from "drizzle-orm"
 import {
   createWorktreeForChat,
@@ -124,7 +124,7 @@ export const chatsRouter = router({
       const chatSubChats = db
         .select()
         .from(subChats)
-        .where(eq(subChats.chatId, input.id))
+        .where(eq(subChats.workspaceId, input.id))
         .orderBy(subChats.createdAt)
         .all()
 
@@ -213,7 +213,7 @@ export const chatsRouter = router({
       const subChat = db
         .insert(subChats)
         .values({
-          chatId: chat.id,
+          workspaceId: chat.id,
           mode: input.mode,
           messages: initialMessages,
         })
@@ -412,7 +412,7 @@ export const chatsRouter = router({
       const chat = db
         .select()
         .from(chats)
-        .where(eq(chats.id, subChat.chatId))
+        .where(eq(chats.id, subChat.workspaceId))
         .get()
 
       const project = chat
@@ -442,7 +442,7 @@ export const chatsRouter = router({
       return db
         .insert(subChats)
         .values({
-          chatId: input.chatId,
+          workspaceId: input.chatId,
           name: input.name,
           mode: input.mode,
           messages: "[]",
@@ -730,7 +730,7 @@ export const chatsRouter = router({
         messages: subChats.messages,
       })
       .from(chats)
-      .leftJoin(subChats, eq(subChats.chatId, chats.id))
+      .leftJoin(subChats, eq(subChats.workspaceId, chats.id))
       .where(isNull(chats.archivedAt))
       .all()
       // Filter by open sub-chats if provided
@@ -861,7 +861,7 @@ export const chatsRouter = router({
         messages: subChats.messages,
       })
       .from(chats)
-      .leftJoin(subChats, eq(subChats.chatId, chats.id))
+      .leftJoin(subChats, eq(subChats.workspaceId, chats.id))
       .where(isNull(chats.archivedAt))
       .all()
       // Filter by open sub-chats if provided

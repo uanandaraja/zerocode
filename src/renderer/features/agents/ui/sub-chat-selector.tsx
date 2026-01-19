@@ -40,7 +40,7 @@ import {
   ContextMenuTrigger,
 } from "../../../components/ui/context-menu"
 import { InlineEdit } from "./inline-edit"
-import { api } from "../../../lib/mock-api"
+import { api } from "../../../lib/api-bridge"
 import { toast } from "sonner"
 import { SearchCombobox } from "../../../components/ui/search-combobox"
 import { SubChatContextMenu } from "./sub-chat-context-menu"
@@ -106,7 +106,7 @@ const SearchHistoryPopover = memo(function SearchHistoryPopover({
           )}
         </div>
         <span className="text-sm truncate flex-1">
-          {subChat.name || "New Chat"}
+          {subChat.name || "New Session"}
         </span>
         <span className="text-sm text-muted-foreground whitespace-nowrap">
           {timeAgo}
@@ -121,9 +121,9 @@ const SearchHistoryPopover = memo(function SearchHistoryPopover({
       onOpenChange={setIsHistoryOpen}
       items={sortedSubChats}
       onSelect={onSelect}
-      placeholder="Search chats..."
+      placeholder="Search sessions..."
       emptyMessage="No results"
-      getItemValue={(subChat) => `${subChat.name || "New Chat"} ${subChat.id}`}
+      getItemValue={(subChat) => `${subChat.name || "New Session"} ${subChat.id}`}
       renderItem={renderItem}
       trigger={
         <Tooltip>
@@ -140,7 +140,7 @@ const SearchHistoryPopover = memo(function SearchHistoryPopover({
             </PopoverTrigger>
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            Search chats
+            Search sessions
             <Kbd>/</Kbd>
           </TooltipContent>
         </Tooltip>
@@ -355,7 +355,7 @@ export function SubChatSelector({
         // Revert on error (like Canvas)
         useAgentSubChatStore
           .getState()
-          .updateSubChatName(subChat.id, oldName || "New Chat")
+          .updateSubChatName(subChat.id, oldName || "New Session")
       } finally {
         setEditLoading(false)
       }
@@ -719,7 +719,7 @@ export function SubChatSelector({
                             }}
                             className="relative z-0 text-left flex-1 min-w-0 pr-1 overflow-hidden block whitespace-nowrap"
                           >
-                            {subChat.name || "New Chat"}
+                            {subChat.name || "New Session"}
                           </span>
                         )}
 

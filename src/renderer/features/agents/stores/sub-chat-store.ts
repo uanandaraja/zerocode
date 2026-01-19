@@ -1,12 +1,16 @@
 import { create } from "zustand"
 
-export interface SubChatMeta {
+// Session metadata (formerly SubChat)
+export interface SessionMeta {
   id: string
   name: string
   created_at?: string
   updated_at?: string
   mode?: "plan" | "agent"
 }
+
+/** @deprecated Use SessionMeta instead */
+export type SubChatMeta = SessionMeta
 
 interface AgentSubChatStore {
   // Current parent chat context
@@ -66,7 +70,8 @@ const loadFromLS = <T>(chatId: string, type: "open" | "active" | "pinned", fallb
   }
 }
 
-export const useAgentSubChatStore = create<AgentSubChatStore>((set, get) => ({
+// Main store hook (legacy name kept for compatibility)
+const useAgentSubChatStore = create<AgentSubChatStore>((set, get) => ({
   chatId: null,
   activeSubChatId: null,
   openSubChatIds: [],
@@ -198,3 +203,8 @@ export const useAgentSubChatStore = create<AgentSubChatStore>((set, get) => ({
     })
   },
 }))
+
+// Export with both old and new names
+export { useAgentSubChatStore }
+/** Alias for useAgentSubChatStore - manages session tabs within a workspace */
+export const useSessionStore = useAgentSubChatStore
