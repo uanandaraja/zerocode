@@ -38,7 +38,7 @@ export const AgentBashTool = memo(function AgentBashTool({
   part,
   chatStatus,
 }: AgentBashToolProps) {
-  const [isOutputExpanded, setIsOutputExpanded] = useState(true)
+  const [isOutputExpanded, setIsOutputExpanded] = useState(false)
   const { isPending } = getToolStatus(part, chatStatus)
 
   const command = part.input?.command || ""
@@ -142,20 +142,22 @@ export const AgentBashTool = memo(function AgentBashTool({
         </div>
       </div>
 
-      {/* Content - only visible when expanded or while running */}
-      {(isOutputExpanded || isPending) && (
-        <div className="border-t border-border px-2.5 py-1.5">
-          {/* Command - always show full command */}
-          <div className="font-mono text-xs">
-            <span className="text-amber-600 dark:text-amber-400">$ </span>
-            <span className="text-foreground whitespace-pre-wrap break-all">
-              {command}
-            </span>
-          </div>
+      {/* Command - always visible */}
+      <div className="border-t border-border px-2.5 py-1.5">
+        <div className="font-mono text-xs">
+          <span className="text-amber-600 dark:text-amber-400">$ </span>
+          <span className="text-foreground whitespace-pre-wrap break-all">
+            {command}
+          </span>
+        </div>
+      </div>
 
+      {/* Output - only visible when expanded or while running */}
+      {(isOutputExpanded || isPending) && (stdout || stderr) && (
+        <div className="border-t border-border px-2.5 py-1.5">
           {/* Stdout */}
           {stdout && (
-            <div className="mt-1.5 font-mono text-xs text-muted-foreground whitespace-pre-wrap break-all">
+            <div className="font-mono text-xs text-muted-foreground whitespace-pre-wrap break-all">
               {stdout}
             </div>
           )}
@@ -164,7 +166,8 @@ export const AgentBashTool = memo(function AgentBashTool({
           {stderr && (
             <div
               className={cn(
-                "mt-1.5 font-mono text-xs whitespace-pre-wrap break-all",
+                "font-mono text-xs whitespace-pre-wrap break-all",
+                stdout && "mt-1.5",
                 // If exitCode is 0, it's a warning (e.g. npm warnings)
                 // If exitCode is non-zero, it's an error
                 exitCode === 0 || exitCode === undefined
