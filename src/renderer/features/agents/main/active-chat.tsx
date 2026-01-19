@@ -1177,11 +1177,15 @@ function ChatViewInner({
 
   // Handler to stop streaming - memoized to prevent ChatInputArea re-renders
   const handleStop = useCallback(async () => {
+    console.log("[ActiveChat] handleStop called for subChatId:", subChatId)
     // Mark as manually aborted to prevent completion sound
     agentChatStore.setManuallyAborted(subChatId, true)
+    console.log("[ActiveChat] Calling useChat stop()")
     await stopRef.current()
+    console.log("[ActiveChat] useChat stop() completed, now calling cancel mutation")
     // Cancel the OpenCode session on the server side
-    await trpcClient.opencode.cancel.mutate({ subChatId })
+    const result = await trpcClient.opencode.cancel.mutate({ subChatId })
+    console.log("[ActiveChat] Cancel mutation result:", result)
   }, [subChatId])
 
   // Keep refs updated for scroll save cleanup to use

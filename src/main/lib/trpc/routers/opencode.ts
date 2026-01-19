@@ -188,7 +188,11 @@ export const opencodeRouter = router({
         return () => {
           abortController.abort()
           eventUnsubscribe?.()
-          activeSessions.delete(input.subChatId)
+          // NOTE: Don't delete from activeSessions here!
+          // The cancel mutation needs access to the session info.
+          // Session cleanup happens either:
+          // 1. When session.idle is received (natural completion)
+          // 2. After cancel mutation completes (user-initiated abort)
         }
       })
     }),
@@ -200,6 +204,7 @@ export const opencodeRouter = router({
     .input(z.object({ subChatId: z.string() }))
     .mutation(async ({ input }) => {
       const session = activeSessions.get(input.subChatId)
+      
       if (session) {
         session.abort()
 

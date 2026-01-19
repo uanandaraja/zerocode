@@ -346,8 +346,11 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
 
         // Handle abort
         options.abortSignal?.addEventListener("abort", () => {
+          console.log("[IPCChatTransport] Abort signal received for subChatId:", this.config.subChatId)
           sub.unsubscribe()
           trpcClient.opencode.cancel.mutate({ subChatId: this.config.subChatId })
+            .then((result) => console.log("[IPCChatTransport] Cancel result:", result))
+            .catch((err) => console.error("[IPCChatTransport] Cancel error:", err))
           try {
             controller.close()
           } catch {
