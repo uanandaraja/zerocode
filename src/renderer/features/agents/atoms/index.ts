@@ -477,11 +477,11 @@ export const lastSelectedBranchesAtom = atomWithStorage<Record<string, string>>(
 
 // Compacting status per sub-chat
 // Set<subChatId> - subChats currently being compacted
-export const compactingSubChatsAtom = atom<Set<string>>(new Set())
+export const compactingSubChatsAtom = atom<Set<string>>(new Set<string>())
 
 // Track IDs of chats/subchats created in this browser session (NOT persisted - resets on reload)
 // Used to determine whether to show placeholder + typewriter effect
-export const justCreatedIdsAtom = atom<Set<string>>(new Set())
+export const justCreatedIdsAtom = atom<Set<string>>(new Set<string>())
 
 // Pending user questions from AskUserQuestion tool
 // Set when Claude requests user input, cleared when answered or skipped
@@ -502,7 +502,7 @@ export const pendingUserQuestionsAtom = atom<PendingUserQuestions | null>(null)
 
 // Track sub-chats with pending plan approval (plan ready but not yet implemented)
 // Set<subChatId>
-export const pendingPlanApprovalsAtom = atom<Set<string>>(new Set())
+export const pendingPlanApprovalsAtom = atom<Set<string>>(new Set<string>())
 
 // Store AskUserQuestion results by toolUseId for real-time updates
 // Map<toolUseId, result>

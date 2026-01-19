@@ -63,6 +63,8 @@ interface SearchHistoryPopoverProps {
   pendingPlanApprovals: Set<string>
   allSubChatsLength: number
   onSelect: (subChat: SubChatMeta) => void
+  isOpen?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 const SearchHistoryPopover = memo(function SearchHistoryPopover({
@@ -73,8 +75,13 @@ const SearchHistoryPopover = memo(function SearchHistoryPopover({
   pendingPlanApprovals,
   allSubChatsLength,
   onSelect,
+  isOpen: controlledIsOpen,
+  onOpenChange: controlledOnOpenChange,
 }: SearchHistoryPopoverProps) {
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [internalIsOpen, setInternalIsOpen] = useState(false)
+  // Support both controlled and uncontrolled modes
+  const isHistoryOpen = controlledIsOpen ?? internalIsOpen
+  const setIsHistoryOpen = controlledOnOpenChange ?? setInternalIsOpen
 
   const renderItem = useCallback((subChat: SubChatMeta) => {
     const timeAgo = formatTimeAgo(subChat.updated_at || subChat.created_at)
@@ -198,7 +205,7 @@ export function SubChatSelector({
   )
   const pendingPlanApprovals = useMemo(() => {
     const set = new Set<string>()
-    if (pendingPlanApprovalsData) {
+    if (Array.isArray(pendingPlanApprovalsData)) {
       for (const { subChatId } of pendingPlanApprovalsData) {
         set.add(subChatId)
       }
@@ -295,6 +302,9 @@ export function SubChatSelector({
   const [editingSubChatId, setEditingSubChatId] = useState<string | null>(null)
   const [editName, setEditName] = useState("")
   const [editLoading, setEditLoading] = useState(false)
+  
+  // History popover state - lifted here to allow hotkey control
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
 
   const renameMutation = api.agents.renameSubChat.useMutation({
     onSuccess: (_, variables) => {
@@ -834,6 +844,8 @@ export function SubChatSelector({
             pendingPlanApprovals={pendingPlanApprovals}
             allSubChatsLength={allSubChats.length}
             onSelect={handleSelectFromHistory}
+            isOpen={isHistoryOpen}
+            onOpenChange={setIsHistoryOpen}
           />
         </div>
       )}

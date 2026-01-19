@@ -1,10 +1,11 @@
 "use client"
 
 import { memo, useState, useMemo, useCallback } from "react"
-import { useSetAtom } from "jotai"
+import { useSetAtom, useAtom } from "jotai"
 import { useTheme } from "next-themes"
 import { PatchDiff } from "@pierre/diffs/react"
 import { createPatch } from "diff"
+import { Columns2, Rows2 } from "lucide-react"
 import {
   IconSpinner,
   ExpandIcon,
@@ -21,6 +22,7 @@ import { AgentToolInterrupted } from "./agent-tool-interrupted"
 import { areToolPropsEqual } from "./agent-tool-utils"
 import { getFileIconByExtension } from "../mentions/agents-file-mention"
 import { agentsDiffSidebarOpenAtom, agentsFocusedDiffFileAtom } from "../atoms"
+import { diffViewModeAtom, DiffModeEnum } from "./agent-diff-view"
 import { cn } from "../../../lib/utils"
 import { useShikiTheme } from "../../../lib/themes/theme-provider"
 
@@ -70,6 +72,8 @@ export const AgentEditTool = memo(function AgentEditTool({
   const isLight = resolvedTheme !== "dark"
   // Use the same theme as the diff sidebar (from user preferences)
   const shikiTheme = useShikiTheme()
+  // Use global diff mode preference (split/unified)
+  const [diffMode, setDiffMode] = useAtom(diffViewModeAtom)
 
   // Atoms for opening diff sidebar and focusing on file
   const setDiffSidebarOpen = useSetAtom(agentsDiffSidebarOpenAtom)
@@ -317,6 +321,30 @@ export const AgentEditTool = memo(function AgentEditTool({
             ) : null}
           </div>
 
+          {/* Diff mode toggle (split/unified) */}
+          {hasContent && !isPending && !isInputStreaming && !isCollapsed && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setDiffMode(diffMode === DiffModeEnum.Split ? DiffModeEnum.Unified : DiffModeEnum.Split)
+                  }}
+                  className="p-1 rounded-md hover:bg-accent transition-[background-color,transform] duration-150 ease-out active:scale-95"
+                >
+                  {diffMode === DiffModeEnum.Split ? (
+                    <Rows2 className="w-3.5 h-3.5 text-muted-foreground" />
+                  ) : (
+                    <Columns2 className="w-3.5 h-3.5 text-muted-foreground" />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {diffMode === DiffModeEnum.Split ? "Unified view" : "Split view"}
+              </TooltipContent>
+            </Tooltip>
+          )}
+
           {/* Expand/Collapse button */}
           {hasContent && !isPending && !isInputStreaming && (
             <button
@@ -353,7 +381,7 @@ export const AgentEditTool = memo(function AgentEditTool({
             options={{
               theme: getPierreTheme(shikiTheme, !isLight),
               themeType: isLight ? "light" : "dark",
-              diffStyle: "split",
+              diffStyle: diffMode === DiffModeEnum.Split ? "split" : "unified",
               diffIndicators: "bars",
               overflow: "scroll",
               disableFileHeader: true,

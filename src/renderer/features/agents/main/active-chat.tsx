@@ -1252,7 +1252,7 @@ function ChatViewInner({
 
   // Memoize the last assistant message to avoid unnecessary recalculations
   const lastAssistantMessage = useMemo(
-    () => messages.findLast((m) => m.role === "assistant"),
+    () => messages.findLast((m: { role: string }) => m.role === "assistant"),
     [messages],
   )
 
@@ -2983,7 +2983,7 @@ export function ChatView({
     const newId = newSubChat.id
 
     // Track this subchat as just created for typewriter effect
-    setJustCreatedIds((prev) => new Set([...prev, newId]))
+    setJustCreatedIds((prev: Set<string>) => new Set([...prev, newId]))
 
     // Add to allSubChats with placeholder name
     store.addToAllSubChats({
@@ -3403,10 +3403,10 @@ export function ChatView({
             .getState()
             .updateSubChatName(subChatIdToUpdate, name)
           // Also update query cache so init effect doesn't overwrite
-          utils.agents.getAgentChat.setData({ chatId }, (old) => {
+          utils.agents.getAgentChat.setData({ chatId }, (old: any) => {
             if (!old) return old
             const existsInCache = old.subChats.some(
-              (sc) => sc.id === subChatIdToUpdate,
+              (sc: { id: string }) => sc.id === subChatIdToUpdate,
             )
             if (!existsInCache) {
               // Sub-chat not in cache yet (DB save still in flight) - add it
@@ -3429,7 +3429,7 @@ export function ChatView({
             }
             return {
               ...old,
-              subChats: old.subChats.map((sc) =>
+              subChats: old.subChats.map((sc: { id: string }) =>
                 sc.id === subChatIdToUpdate ? { ...sc, name } : sc,
               ),
             }
@@ -3440,9 +3440,9 @@ export function ChatView({
           // On desktop, selectedTeamId is always null, so we update unconditionally
           utils.agents.getAgentChats.setData(
             { teamId: selectedTeamId },
-            (old) => {
+            (old: any) => {
               if (!old) return old
-              return old.map((c) =>
+              return old.map((c: { id: string }) =>
                 c.id === chatIdToUpdate ? { ...c, name } : c,
               )
             },
@@ -3450,7 +3450,7 @@ export function ChatView({
           // Optimistic update for header (single chat query)
           utils.agents.getAgentChat.setData(
             { chatId: chatIdToUpdate },
-            (old) => {
+            (old: any) => {
               if (!old) return old
               return { ...old, name }
             },
@@ -4048,7 +4048,7 @@ export function ChatView({
                     ref={diffViewRef}
                     chatId={chatId}
                     sandboxId={sandboxId}
-                    worktreePath={worktreePath || undefined}
+                    worktreePath={worktreePath ?? undefined}
                     repository={repository}
                     onStatsChange={setDiffStats}
                     initialDiff={diffContent}

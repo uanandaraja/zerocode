@@ -50,9 +50,10 @@ export const AgentBashTool = memo(function AgentBashTool({
   const { isPending } = getToolStatus(part, chatStatus)
 
   const command = part.input?.command || ""
-  const stdout = part.output?.stdout || part.output?.output || ""
-  const stderr = part.output?.stderr || ""
-  const exitCode = part.output?.exitCode ?? part.output?.exit_code
+  // Check multiple possible locations for output
+  const stdout = part.output?.stdout || part.output?.output || part.result?.stdout || part.result?.output || ""
+  const stderr = part.output?.stderr || part.result?.stderr || ""
+  const exitCode = part.output?.exitCode ?? part.output?.exit_code ?? part.result?.exitCode ?? part.result?.exit_code
 
   // For bash tools, success/error is determined by exitCode, not by state
   // exitCode 0 = success, anything else (or undefined if no output yet) = error

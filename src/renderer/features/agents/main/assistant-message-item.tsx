@@ -11,6 +11,7 @@ import {
 import { MemoizedTextPart } from "./memoized-text-part"
 import { AgentBashTool } from "../ui/agent-bash-tool"
 import { AgentEditTool } from "../ui/agent-edit-tool"
+import { AgentReadTool } from "../ui/agent-read-tool"
 import { AgentTaskTool } from "../ui/agent-task-tool"
 import { AgentThinkingTool } from "../ui/agent-thinking-tool"
 import { AgentPlanTool } from "../ui/agent-plan-tool"
@@ -390,6 +391,7 @@ export const AssistantMessageItem = memo(function AssistantMessageItem({
     if (part.type === "tool-Thinking") return <AgentThinkingTool key={idx} part={part} chatStatus={status} />
     if (part.type === "tool-Edit") return <AgentEditTool key={idx} part={part} chatStatus={status} />
     if (part.type === "tool-Write") return <AgentEditTool key={idx} part={part} chatStatus={status} />
+    if (part.type === "tool-Read") return <AgentReadTool key={idx} part={part} chatStatus={status} />
     if (part.type === "tool-WebSearch") return <AgentWebSearchCollapsible key={idx} part={part} chatStatus={status} />
     if (part.type === "tool-WebFetch") return <AgentWebFetchTool key={idx} part={part} chatStatus={status} />
     if (part.type === "tool-PlanWrite") return <AgentPlanTool key={idx} part={part} chatStatus={status} />

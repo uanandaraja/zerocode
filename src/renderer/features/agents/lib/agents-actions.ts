@@ -84,7 +84,7 @@ const openSettingsAction: AgentActionDefinition = {
   category: "general",
   hotkey: ["cmd+,", "ctrl+,"],
   handler: async (context) => {
-    context.setSettingsActiveTab?.("profile")
+    context.setSettingsActiveTab?.("preferences")
     context.setSettingsDialogOpen?.(true)
     return { success: true }
   },

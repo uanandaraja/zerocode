@@ -1704,7 +1704,7 @@ export function AgentsSidebar({
   // Aggregate pending plan approvals by workspace (chatId) from DB
   const workspacePendingPlans = useMemo(() => {
     const chatIdsWithPendingPlans = new Set<string>()
-    if (pendingPlanApprovalsData) {
+    if (Array.isArray(pendingPlanApprovalsData)) {
       for (const { chatId } of pendingPlanApprovalsData) {
         chatIdsWithPendingPlans.add(chatId)
       }

@@ -95,6 +95,8 @@ interface SidebarSearchHistoryPopoverProps {
   pendingQuestions: { subChatId: string } | null
   allSubChatsLength: number
   onSelect: (subChat: SubChatMeta) => void
+  isOpen?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 const SidebarSearchHistoryPopover = memo(function SidebarSearchHistoryPopover({
@@ -104,8 +106,13 @@ const SidebarSearchHistoryPopover = memo(function SidebarSearchHistoryPopover({
   pendingQuestions,
   allSubChatsLength,
   onSelect,
+  isOpen: controlledIsOpen,
+  onOpenChange: controlledOnOpenChange,
 }: SidebarSearchHistoryPopoverProps) {
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [internalIsOpen, setInternalIsOpen] = useState(false)
+  // Support both controlled and uncontrolled modes
+  const isHistoryOpen = controlledIsOpen ?? internalIsOpen
+  const setIsHistoryOpen = controlledOnOpenChange ?? setInternalIsOpen
 
   const renderItem = useCallback((subChat: SubChatMeta) => {
     const timeAgo = formatTimeAgo(subChat.updated_at || subChat.created_at)
@@ -250,7 +257,7 @@ export function AgentsSubChatsSidebar({
   )
   const pendingPlanApprovals = useMemo(() => {
     const set = new Set<string>()
-    if (pendingPlanApprovalsData) {
+    if (Array.isArray(pendingPlanApprovalsData)) {
       for (const { subChatId } of pendingPlanApprovalsData) {
         set.add(subChatId)
       }
@@ -269,6 +276,8 @@ export function AgentsSubChatsSidebar({
     null,
   )
   const [renameLoading, setRenameLoading] = useState(false)
+  // History popover state - lifted here to allow control from handleSelectFromHistory
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [showTopGradient, setShowTopGradient] = useState(false)
   const [showBottomGradient, setShowBottomGradient] = useState(false)
   // Using ref instead of state to avoid re-renders on hover
@@ -609,7 +618,7 @@ export function AgentsSubChatsSidebar({
       useAgentSubChatStore.getState().updateSubChatName(subChatId, newName)
 
       // Remove from justCreatedIds to prevent typewriter animation on manual rename
-      setJustCreatedIds((prev) => {
+      setJustCreatedIds((prev: Set<string>) => {
         if (prev.has(subChatId)) {
           const next = new Set(prev)
           next.delete(subChatId)
@@ -652,7 +661,7 @@ export function AgentsSubChatsSidebar({
     const newId = newSubChat.id
 
     // Track this subchat as just created for typewriter effect
-    setJustCreatedIds((prev) => new Set([...prev, newId]))
+    setJustCreatedIds((prev: Set<string>) => new Set([...prev, newId]))
 
     // Add to allSubChats with placeholder name
     store.addToAllSubChats({
@@ -950,6 +959,8 @@ export function AgentsSubChatsSidebar({
         pendingQuestions={pendingQuestions}
         allSubChatsLength={allSubChats.length}
         onSelect={handleSelectFromHistory}
+        isOpen={isHistoryOpen}
+        onOpenChange={setIsHistoryOpen}
       />
       <Tooltip delayDuration={500}>
         <TooltipTrigger asChild>
