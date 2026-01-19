@@ -4,15 +4,11 @@ import { ThemeProvider, useTheme } from "next-themes"
 import { Toaster } from "sonner"
 import { TRPCProvider } from "./contexts/TRPCProvider"
 import { AgentsLayout } from "./features/layout/agents-layout"
-import {
-  AnthropicOnboardingPage,
-  SelectRepoPage,
-} from "./features/onboarding"
+import { SelectRepoPage } from "./features/onboarding"
 import { TooltipProvider } from "./components/ui/tooltip"
 import { appStore } from "./lib/jotai-store"
-import { initAnalytics, identify, shutdown } from "./lib/analytics"
+import { initAnalytics, shutdown } from "./lib/analytics"
 import { VSCodeThemeProvider } from "./lib/themes/theme-provider"
-import { anthropicOnboardingCompletedAtom } from "./lib/atoms"
 import { selectedProjectAtom } from "./features/agents/atoms"
 import { trpc } from "./lib/trpc"
 
@@ -35,9 +31,6 @@ function ThemedToaster() {
  * Main content router - decides which page to show based on onboarding state
  */
 function AppContent() {
-  const anthropicOnboardingCompleted = useAtomValue(
-    anthropicOnboardingCompletedAtom
-  )
   const selectedProject = useAtomValue(selectedProjectAtom)
 
   // Fetch projects to validate selectedProject exists
@@ -54,14 +47,6 @@ function AppContent() {
     const exists = projects.some((p) => p.id === selectedProject.id)
     return exists ? selectedProject : null
   }, [selectedProject, projects, isLoadingProjects])
-
-  // Determine which page to show:
-  // 1. Anthropic onboarding not completed -> AnthropicOnboardingPage
-  // 2. No valid project selected -> SelectRepoPage
-  // 3. Otherwise -> AgentsLayout
-  if (!anthropicOnboardingCompleted) {
-    return <AnthropicOnboardingPage />
-  }
 
   if (!validatedProject && !isLoadingProjects) {
     return <SelectRepoPage />
@@ -86,19 +71,6 @@ export function App() {
       }
     }
     syncOptOutStatus()
-
-    // Identify user if already authenticated
-    const identifyUser = async () => {
-      try {
-        const user = await window.desktopApi?.getUser()
-        if (user?.id) {
-          identify(user.id, { email: user.email, name: user.name })
-        }
-      } catch (error) {
-        console.warn("[Analytics] Failed to identify user:", error)
-      }
-    }
-    identifyUser()
 
     // Cleanup on unmount
     return () => {

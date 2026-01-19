@@ -458,6 +458,71 @@ const MIN_LIGHT: VSCodeFullTheme = {
 }
 
 /**
+ * OpenCode Light theme colors
+ * Clean light theme with blue accent
+ */
+const OPENCODE_LIGHT: VSCodeFullTheme = {
+  id: "opencode-light",
+  name: "OpenCode Light",
+  type: "light",
+  source: "builtin",
+  colors: {
+    "editor.background": "#ffffff", // bg
+    "editorPane.background": "#ffffff",
+    "editor.foreground": "#1a1a1a", // fg
+    "foreground": "#1a1a1a",
+    "sideBar.background": "#fafafa", // bg1
+    "sideBar.foreground": "#1a1a1a",
+    "sideBar.border": "#ebebeb", // bg3
+    "activityBar.background": "#ffffff",
+    "activityBar.foreground": "#1a1a1a",
+    "panel.background": "#fafafa", // bg1
+    "panel.border": "#ebebeb", // bg3
+    "tab.activeBackground": "#ffffff", // bg
+    "tab.inactiveBackground": "#f5f5f5", // bg2
+    "tab.inactiveForeground": "#8a8a8a", // fg_muted
+    "editorGroupHeader.tabsBackground": "#fafafa",
+    "dropdown.background": "#ffffff",
+    "dropdown.foreground": "#1a1a1a",
+    "input.background": "#fafafa", // bg1
+    "input.border": "#e1e1e1", // bg4
+    "input.foreground": "#1a1a1a",
+    "focusBorder": "#3b7dd8", // blue
+    "textLink.foreground": "#3b7dd8", // blue
+    "textLink.activeForeground": "#2968c3", // blue_dark
+    "list.activeSelectionBackground": "#ebebeb", // bg3
+    "list.hoverBackground": "#f5f5f5", // bg2
+    "editor.selectionBackground": "#3b7dd833", // blue with alpha
+    "editorLineNumber.foreground": "#a0a0a0", // fg_gutter
+    "descriptionForeground": "#8a8a8a", // fg_muted
+    "errorForeground": "#d1383d", // red
+    "button.background": "#3b7dd8", // blue
+    "button.foreground": "#ffffff",
+    "button.secondaryBackground": "#e1e1e1", // bg4
+    "button.secondaryForeground": "#1a1a1a",
+    // Terminal colors
+    "terminal.background": "#fafafa", // bg1
+    "terminal.foreground": "#1a1a1a",
+    "terminal.ansiBlack": "#1a1a1a",
+    "terminal.ansiRed": "#d1383d", // red
+    "terminal.ansiGreen": "#3d9a57", // green
+    "terminal.ansiYellow": "#b0851f", // yellow
+    "terminal.ansiBlue": "#3b7dd8", // blue
+    "terminal.ansiMagenta": "#7b5bb6", // purple
+    "terminal.ansiCyan": "#318795", // cyan
+    "terminal.ansiWhite": "#d4d4d4", // bg5
+    "terminal.ansiBrightBlack": "#8a8a8a", // fg_muted
+    "terminal.ansiBrightRed": "#d1383d",
+    "terminal.ansiBrightGreen": "#3d9a57",
+    "terminal.ansiBrightYellow": "#d68c27", // orange
+    "terminal.ansiBrightBlue": "#3b7dd8",
+    "terminal.ansiBrightMagenta": "#7b5bb6",
+    "terminal.ansiBrightCyan": "#318795",
+    "terminal.ansiBrightWhite": "#1a1a1a",
+  },
+}
+
+/**
  * Claude Light theme colors
  * Warm, beige tones with orange accent (Claude's signature color)
  */
@@ -519,6 +584,71 @@ const CLAUDE_LIGHT: VSCodeFullTheme = {
     "terminal.ansiBrightMagenta": "#a855f7",
     "terminal.ansiBrightCyan": "#06b6d4",
     "terminal.ansiBrightWhite": "#FAF9F5",
+  },
+}
+
+/**
+ * OpenCode Dark theme colors
+ * Clean dark theme with blue and orange accents
+ */
+const OPENCODE_DARK: VSCodeFullTheme = {
+  id: "opencode-dark",
+  name: "OpenCode Dark",
+  type: "dark",
+  source: "builtin",
+  colors: {
+    "editor.background": "#0a0a0a", // bg
+    "editorPane.background": "#0a0a0a",
+    "editor.foreground": "#eeeeee", // fg
+    "foreground": "#eeeeee",
+    "sideBar.background": "#141414", // bg1
+    "sideBar.foreground": "#eeeeee",
+    "sideBar.border": "#282828", // bg3
+    "activityBar.background": "#0a0a0a",
+    "activityBar.foreground": "#eeeeee",
+    "panel.background": "#141414", // bg1
+    "panel.border": "#282828", // bg3
+    "tab.activeBackground": "#1e1e1e", // bg2
+    "tab.inactiveBackground": "#141414", // bg1
+    "tab.inactiveForeground": "#808080", // fg_muted
+    "editorGroupHeader.tabsBackground": "#141414",
+    "dropdown.background": "#1e1e1e", // bg2
+    "dropdown.foreground": "#eeeeee",
+    "input.background": "#141414", // bg1
+    "input.border": "#323232", // bg4
+    "input.foreground": "#eeeeee",
+    "focusBorder": "#5c9cf5", // blue
+    "textLink.foreground": "#5c9cf5", // blue
+    "textLink.activeForeground": "#fab283", // orange
+    "list.activeSelectionBackground": "#282828", // bg3
+    "list.hoverBackground": "#1e1e1e", // bg2
+    "editor.selectionBackground": "#5c9cf544", // blue with alpha
+    "editorLineNumber.foreground": "#606060", // fg_gutter
+    "descriptionForeground": "#808080", // fg_muted
+    "errorForeground": "#e06c75", // red
+    "button.background": "#5c9cf5", // blue
+    "button.foreground": "#0a0a0a",
+    "button.secondaryBackground": "#323232", // bg4
+    "button.secondaryForeground": "#eeeeee",
+    // Terminal colors
+    "terminal.background": "#0a0a0a",
+    "terminal.foreground": "#eeeeee",
+    "terminal.ansiBlack": "#141414", // bg1
+    "terminal.ansiRed": "#e06c75", // red
+    "terminal.ansiGreen": "#7fd88f", // green
+    "terminal.ansiYellow": "#e5c07b", // yellow
+    "terminal.ansiBlue": "#5c9cf5", // blue
+    "terminal.ansiMagenta": "#9d7cd8", // purple
+    "terminal.ansiCyan": "#56b6c2", // cyan
+    "terminal.ansiWhite": "#eeeeee", // fg
+    "terminal.ansiBrightBlack": "#606060", // fg_gutter
+    "terminal.ansiBrightRed": "#e06c75",
+    "terminal.ansiBrightGreen": "#7fd88f",
+    "terminal.ansiBrightYellow": "#f5a742", // yellow_orange
+    "terminal.ansiBrightBlue": "#5c9cf5",
+    "terminal.ansiBrightMagenta": "#9d7cd8",
+    "terminal.ansiBrightCyan": "#56b6c2",
+    "terminal.ansiBrightWhite": "#eeeeee",
   },
 }
 
@@ -599,11 +729,13 @@ export const BUILTIN_THEMES: VSCodeFullTheme[] = [
   CURSOR_LIGHT,
   CURSOR_MIDNIGHT,
   // Dark themes
+  OPENCODE_DARK,
   CLAUDE_DARK,
   VESPER_DARK,
   VITESSE_DARK,
   MIN_DARK,
   // Light themes
+  OPENCODE_LIGHT,
   CLAUDE_LIGHT,
   VITESSE_LIGHT,
   MIN_LIGHT,

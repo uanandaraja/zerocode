@@ -191,12 +191,29 @@ export const isPlanModeAtom = atomWithStorage<boolean>(
   { getOnInit: true },
 )
 
-// Model ID to full Claude model string mapping
+// Model ID to full Claude model string mapping (legacy - kept for backward compatibility)
 export const MODEL_ID_MAP: Record<string, string> = {
   opus: "opus",
   sonnet: "sonnet",
   haiku: "haiku",
 }
+
+// OpenCode provider/model selection
+// Provider ID (e.g., "azure-cognitive-services", "anthropic", "openai")
+export const selectedProviderAtom = atomWithStorage<string>(
+  "agents:selectedProvider",
+  "azure-cognitive-services", // Default to Azure for your setup
+  undefined,
+  { getOnInit: true },
+)
+
+// Model ID within the selected provider (e.g., "claude-opus-4-5", "claude-sonnet-4-5")
+export const selectedModelAtom = atomWithStorage<string>(
+  "agents:selectedModel",
+  "claude-opus-4-5", // Default to Opus
+  undefined,
+  { getOnInit: true },
+)
 
 // Sidebar state
 export const agentsSidebarOpenAtom = atomWithStorage<boolean>(
@@ -438,19 +455,7 @@ export const pendingPrMessageAtom = atom<string | null>(null)
 // Set by ChatView when "Review" is clicked, consumed by ChatViewInner
 export const pendingReviewMessageAtom = atom<string | null>(null)
 
-// Pending auth retry - stores failed message when auth-error occurs
-// After successful OAuth flow, this triggers automatic retry of the message
-export type PendingAuthRetryMessage = {
-  subChatId: string  // Required: only retry in the correct chat
-  prompt: string
-  images?: Array<{
-    base64Data: string
-    mediaType: string
-    filename?: string
-  }>
-  readyToRetry: boolean  // Only retry when this is true (set by modal on OAuth success)
-}
-export const pendingAuthRetryMessageAtom = atom<PendingAuthRetryMessage | null>(null)
+
 
 // Work mode preference (local = work in project dir, worktree = create isolated worktree)
 export type WorkMode = "local" | "worktree"
@@ -472,11 +477,11 @@ export const lastSelectedBranchesAtom = atomWithStorage<Record<string, string>>(
 
 // Compacting status per sub-chat
 // Set<subChatId> - subChats currently being compacted
-export const compactingSubChatsAtom = atom<Set<string>>(new Set())
+export const compactingSubChatsAtom = atom<Set<string>>(new Set<string>())
 
 // Track IDs of chats/subchats created in this browser session (NOT persisted - resets on reload)
 // Used to determine whether to show placeholder + typewriter effect
-export const justCreatedIdsAtom = atom<Set<string>>(new Set())
+export const justCreatedIdsAtom = atom<Set<string>>(new Set<string>())
 
 // Pending user questions from AskUserQuestion tool
 // Set when Claude requests user input, cleared when answered or skipped
@@ -497,7 +502,7 @@ export const pendingUserQuestionsAtom = atom<PendingUserQuestions | null>(null)
 
 // Track sub-chats with pending plan approval (plan ready but not yet implemented)
 // Set<subChatId>
-export const pendingPlanApprovalsAtom = atom<Set<string>>(new Set())
+export const pendingPlanApprovalsAtom = atom<Set<string>>(new Set<string>())
 
 // Store AskUserQuestion results by toolUseId for real-time updates
 // Map<toolUseId, result>

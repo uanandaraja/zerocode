@@ -26,9 +26,8 @@ import { ArchivePopover } from "../agents/ui/archive-popover"
 import { ChevronDown, MoreHorizontal } from "lucide-react"
 // import { useRouter } from "next/navigation" // Desktop doesn't use next/navigation
 // import { useCombinedAuth } from "@/lib/hooks/use-combined-auth"
-const useCombinedAuth = () => ({ userId: null })
-// import { AuthDialog } from "@/components/auth/auth-dialog"
-const AuthDialog = () => null
+const useCombinedAuth = () => ({ userId: null, isLoaded: true })
+const AuthDialog = (props: any) => null
 // Desktop: archive is handled inline, not via hook
 // import { DiscordIcon } from "@/components/icons"
 import { DiscordIcon } from "../../icons"
@@ -309,6 +308,7 @@ const AgentChatItem = React.memo(function AgentChatItem({
   chatBranch,
   chatUpdatedAt,
   chatProjectId,
+  projectName,
   globalIndex,
   isSelected,
   isLoading,
@@ -353,6 +353,7 @@ const AgentChatItem = React.memo(function AgentChatItem({
   chatBranch: string | null
   chatUpdatedAt: Date | null
   chatProjectId: string
+  projectName: string
   globalIndex: number
   isSelected: boolean
   isLoading: boolean
@@ -464,13 +465,9 @@ const AgentChatItem = React.memo(function AgentChatItem({
                   ref={(el) => nameRefCallback(chatId, el)}
                   className="truncate block text-sm leading-tight flex-1"
                 >
-                  <TypewriterText
-                    text={chatName || ""}
-                    placeholder="New workspace"
-                    id={chatId}
-                    isJustCreated={justCreatedIds.has(chatId)}
-                    showPlaceholder={true}
-                  />
+                  {/* Heading: Project/repo name */}
+                  {projectName}
+                  {displayText && <span className="text-muted-foreground/60"> • {displayText}</span>}
                 </span>
                 {/* Hide archive button on mobile - use context menu instead */}
                 {!isMultiSelectMode && !isMobileFullscreen && (
@@ -488,7 +485,16 @@ const AgentChatItem = React.memo(function AgentChatItem({
                 )}
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 min-w-0">
-                <span className="truncate flex-1 min-w-0">{displayText}</span>
+                {/* Secondary: Workspace name (initial prompt) + time */}
+                <span className="truncate flex-1 min-w-0">
+                  <TypewriterText
+                    text={chatName || ""}
+                    placeholder="New workspace"
+                    id={chatId}
+                    isJustCreated={justCreatedIds.has(chatId)}
+                    showPlaceholder={true}
+                  />
+                </span>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   {stats && (stats.additions > 0 || stats.deletions > 0) && (
                     <>
@@ -670,12 +676,9 @@ const ChatListSection = React.memo(function ChatListSection({
           const globalIndex = filteredChats.findIndex((c) => c.id === chat.id)
           const isFocused = focusedChatIndex === globalIndex && focusedChatIndex >= 0
           const project = projectsMap.get(chat.projectId)
-          const repoName = project?.gitRepo || project?.name
-          const displayText = chat.branch
-            ? repoName
-              ? `${repoName} • ${chat.branch}`
-              : chat.branch
-            : repoName || "Local project"
+          const repoName = project?.gitRepo || project?.name || "Local project"
+          // displayText now shows branch info if available
+          const displayText = chat.branch || ""
           const isChecked = selectedChatIds.has(chat.id)
           const stats = workspaceFileStats.get(chat.id)
           const hasPendingPlan = workspacePendingPlans.has(chat.id)
@@ -689,6 +692,7 @@ const ChatListSection = React.memo(function ChatListSection({
               chatBranch={chat.branch}
               chatUpdatedAt={chat.updatedAt}
               chatProjectId={chat.projectId}
+              projectName={repoName}
               globalIndex={globalIndex}
               isSelected={isSelected}
               isLoading={isLoading}
@@ -738,7 +742,7 @@ const ChatListSection = React.memo(function ChatListSection({
 interface AgentsSidebarProps {
   userId?: string | null | undefined
   clerkUser?: any
-  desktopUser?: { id: string; email: string; name?: string } | null
+  desktopUser?: { id: string; email: string; name?: string | null } | null
   onSignOut?: () => void
   onToggleSidebar?: () => void
   isMobileFullscreen?: boolean
@@ -811,16 +815,16 @@ interface SidebarHeaderProps {
   isFullscreen: boolean | null
   isMobileFullscreen: boolean
   userId: string | null | undefined
-  desktopUser: { id: string; email: string; name?: string } | null
+  desktopUser: { id: string; email: string; name?: string | null } | null
   onSignOut: () => void
   onToggleSidebar?: () => void
   setSettingsDialogOpen: (open: boolean) => void
-  setSettingsActiveTab: (tab: string) => void
+  setSettingsActiveTab: (tab: any) => void
   setShortcutsDialogOpen: (open: boolean) => void
   setShowAuthDialog: (open: boolean) => void
   handleSidebarMouseEnter: () => void
-  handleSidebarMouseLeave: () => void
-  closeButtonRef: React.RefObject<HTMLDivElement>
+  handleSidebarMouseLeave: (e: React.MouseEvent) => void
+  closeButtonRef: React.RefObject<HTMLDivElement | null>
 }
 
 const SidebarHeader = memo(function SidebarHeader({
@@ -948,32 +952,12 @@ const SidebarHeader = memo(function SidebarHeader({
               >
                 {userId ? (
                   <>
-                    {/* Project section at the top */}
-                    <div className="relative rounded-t-xl border-b overflow-hidden">
-                      <div className="absolute inset-0 bg-popover brightness-110" />
-                      <div className="relative pl-2 pt-1.5 pb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-8 h-8 rounded flex items-center justify-center bg-background flex-shrink-0 overflow-hidden">
-                            <Logo className="w-4 h-4" />
-                          </div>
-                          <div className="flex-1 min-w-0 overflow-hidden">
-                            <div className="font-medium text-sm text-foreground truncate">
-                              {desktopUser?.name || "User"}
-                            </div>
-                            <div className="text-xs text-muted-foreground truncate">
-                              {desktopUser?.email}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
                     {/* Settings */}
                     <DropdownMenuItem
                       className="gap-2"
                       onSelect={() => {
                         setIsDropdownOpen(false)
-                        setSettingsActiveTab("profile")
+                        setSettingsActiveTab("appearance")
                         setSettingsDialogOpen(true)
                       }}
                     >
@@ -1020,66 +1004,21 @@ const SidebarHeader = memo(function SidebarHeader({
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
 
-                    <DropdownMenuSeparator />
-
-                    {/* Log out */}
-                    <div className="">
-                      <DropdownMenuItem
-                        className="gap-2"
-                        onSelect={() => onSignOut()}
-                      >
-                        <svg
-                          className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <polyline
-                            points="16,17 21,12 16,7"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <line
-                            x1="21"
-                            y1="12"
-                            x2="9"
-                            y2="12"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                        Log out
-                      </DropdownMenuItem>
-                    </div>
                   </>
                 ) : (
                   <>
-                    {/* Login for unauthenticated users */}
-                    <div className="">
-                      <DropdownMenuItem
-                        className="gap-2"
-                        onSelect={() => {
-                          setIsDropdownOpen(false)
-                          setShowAuthDialog(true)
-                        }}
-                      >
-                        <ProfileIcon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                        Login
-                      </DropdownMenuItem>
-                    </div>
-
-                    <DropdownMenuSeparator />
+                    {/* Settings for unauthenticated users */}
+                    <DropdownMenuItem
+                      className="gap-2"
+                      onSelect={() => {
+                        setIsDropdownOpen(false)
+                        setSettingsActiveTab("appearance")
+                        setSettingsDialogOpen(true)
+                      }}
+                    >
+                      <SettingsIcon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                      Settings
+                    </DropdownMenuItem>
 
                     {/* Help Submenu */}
                     <DropdownMenuSub>
@@ -1611,7 +1550,7 @@ export function AgentsSidebar({
 
     const filtered = searchQuery.trim()
       ? agentChats.filter((chat) =>
-          chat.name.toLowerCase().includes(searchQuery.toLowerCase()),
+          chat.name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false,
         )
       : agentChats
 
@@ -1750,8 +1689,7 @@ export function AgentsSidebar({
   // Convert file stats from DB to a Map for easy lookup
   const workspaceFileStats = useMemo(() => {
     const statsMap = new Map<string, { fileCount: number; additions: number; deletions: number }>()
-    if (fileStatsData) {
-      
+    if (fileStatsData && Array.isArray(fileStatsData)) {
       for (const stat of fileStatsData) {
         statsMap.set(stat.chatId, {
           fileCount: stat.fileCount,
@@ -1766,7 +1704,7 @@ export function AgentsSidebar({
   // Aggregate pending plan approvals by workspace (chatId) from DB
   const workspacePendingPlans = useMemo(() => {
     const chatIdsWithPendingPlans = new Set<string>()
-    if (pendingPlanApprovalsData) {
+    if (Array.isArray(pendingPlanApprovalsData)) {
       for (const { chatId } of pendingPlanApprovalsData) {
         chatIdsWithPendingPlans.add(chatId)
       }
@@ -2463,7 +2401,7 @@ export function AgentsSidebar({
                     <button
                       type="button"
                       onClick={() => {
-                        setSettingsActiveTab("profile")
+                        setSettingsActiveTab("appearance")
                         setSettingsDialogOpen(true)
                       }}
                       className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.97] outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/70"
@@ -2484,18 +2422,7 @@ export function AgentsSidebar({
               <div className="flex-1" />
             </div>
 
-            {/* Feedback Button */}
-            <ButtonCustom
-              onClick={() => window.open(FEEDBACK_URL, "_blank")}
-              variant="outline"
-              size="sm"
-              className={cn(
-                "px-2 w-full hover:bg-foreground/10 transition-[background-color,transform] duration-150 ease-out active:scale-[0.97] text-foreground rounded-lg gap-1.5",
-                isMobileFullscreen ? "h-10" : "h-7",
-              )}
-            >
-              <span className="text-sm font-medium">Feedback</span>
-            </ButtonCustom>
+
           </motion.div>
         )}
       </AnimatePresence>

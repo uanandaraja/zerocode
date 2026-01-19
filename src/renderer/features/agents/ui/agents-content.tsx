@@ -4,11 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
 // import { useSearchParams, useRouter } from "next/navigation" // Desktop doesn't use next/navigation
 // Desktop: mock Next.js navigation hooks
-const useSearchParams = () => ({ get: () => null })
-const useRouter = () => ({ push: () => {}, replace: () => {} })
+const useSearchParams = () => ({ get: (_key?: string) => null })
+const useRouter = () => ({ push: (_url?: string) => {}, replace: (_url?: string, _opts?: unknown) => {} })
 // Desktop: mock Clerk hooks
 const useUser = () => ({ user: null })
-const useClerk = () => ({ signOut: () => {} })
+const useClerk = () => ({ signOut: (_opts?: unknown) => {} })
 import {
   selectedAgentChatIdAtom,
   previousAgentChatIdAtom,
@@ -28,7 +28,7 @@ import {
 } from "../../../lib/atoms"
 import { NewChatForm } from "../main/new-chat-form"
 import { ChatView } from "../main/active-chat"
-import { api } from "../../../lib/mock-api"
+import { api } from "../../../lib/api-bridge"
 import { trpc } from "../../../lib/trpc"
 import { useIsMobile } from "../../../lib/hooks/use-mobile"
 import { AgentsSidebar } from "../../sidebar/agents-sidebar"
@@ -258,7 +258,7 @@ export function AgentsContent() {
   const sortedChats = agentChats
     ? [...agentChats].sort(
         (a, b) =>
-          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+          new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime(),
       )
     : []
 
@@ -397,8 +397,8 @@ export function AgentsContent() {
             // Get sorted chat list
             const sortedChats = [...agentChats].sort(
               (a, b) =>
-                new Date(b.updated_at).getTime() -
-                new Date(a.updated_at).getTime(),
+                new Date(b.updatedAt ?? 0).getTime() -
+                new Date(a.updatedAt ?? 0).getTime(),
             )
             isNavigatingRef.current = true
             setTimeout(() => {
@@ -694,12 +694,8 @@ export function AgentsContent() {
   // Note: Cmd+E archive hotkey is handled in AgentsSidebar to share undo stack
 
   const handleSignOut = async () => {
-    // Check if running in Electron desktop app
-    if (typeof window !== "undefined" && window.desktopApi) {
-      // Use desktop logout which clears the token and shows login page
-      await window.desktopApi.logout()
-    } else {
-      // Web: use Clerk sign out
+    // Web: use Clerk sign out (desktop doesn't need sign out anymore)
+    if (typeof window !== "undefined" && !window.desktopApi) {
       await signOut({ redirectUrl: window.location.pathname })
     }
   }
@@ -891,7 +887,7 @@ export function AgentsContent() {
             isSidebarOpen={sidebarOpen}
             onBackToChats={() => setSidebarOpen((prev) => !prev)}
             isLoading={isLoadingSubChats}
-            agentName={chatData?.name}
+            agentName={chatData?.name ?? undefined}
           />
         </ResizableSidebar>
 

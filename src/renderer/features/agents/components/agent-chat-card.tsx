@@ -13,10 +13,11 @@ import { agentsUnseenChangesAtom, lastChatModesAtom } from "../atoms"
 interface AgentChatCardProps {
   chat: {
     id: string
-    name: string
-    meta: any
-    sandbox_id: string | null
+    name: string | null
     branch?: string | null
+    // Legacy web fields (optional for backwards compatibility)
+    meta?: any
+    sandbox_id?: string | null
   }
   isSelected: boolean
   isLoading: boolean

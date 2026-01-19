@@ -49,7 +49,6 @@ import {
 // e2b API routes are used instead of useSandboxManager for agents
 // import { clearSubChatSelectionAtom, isSubChatMultiSelectModeAtom, selectedSubChatIdsAtom } from "@/lib/atoms/agent-subchat-selection"
 import { Chat, useChat } from "@ai-sdk/react"
-import { DiffModeEnum } from "@git-diff-view/react"
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
 import {
   ChevronDown,
@@ -79,7 +78,7 @@ import { trackMessageSent } from "../../../lib/analytics"
 import { apiFetch } from "../../../lib/api-fetch"
 import { soundNotificationsEnabledAtom } from "../../../lib/atoms"
 import { appStore } from "../../../lib/jotai-store"
-import { api } from "../../../lib/mock-api"
+import { api } from "../../../lib/api-bridge"
 import { trpc, trpcClient } from "../../../lib/trpc"
 import { getQueryClient } from "../../../contexts/TRPCProvider"
 import { cn } from "../../../lib/utils"
@@ -101,7 +100,6 @@ import {
   justCreatedIdsAtom,
   lastSelectedModelIdAtom,
   loadingSubChatsAtom,
-  pendingAuthRetryMessageAtom,
   pendingPrMessageAtom,
   pendingReviewMessageAtom,
   pendingUserQuestionsAtom,
@@ -146,6 +144,7 @@ import { AgentContextIndicator } from "../ui/agent-context-indicator"
 import {
   AgentDiffView,
   diffViewModeAtom,
+  DiffModeEnum,
   splitUnifiedDiffByFile,
   type AgentDiffViewRef,
 } from "../ui/agent-diff-view"
@@ -976,7 +975,7 @@ function ChatViewInner({
         // Revert on error (toast shown by mutation onError)
         useAgentSubChatStore
           .getState()
-          .updateSubChatName(subChatId, subChatNameRef.current || "New Chat")
+          .updateSubChatName(subChatId, subChatNameRef.current || "New Session")
       }
     },
     [subChatId],
@@ -1253,7 +1252,7 @@ function ChatViewInner({
 
   // Memoize the last assistant message to avoid unnecessary recalculations
   const lastAssistantMessage = useMemo(
-    () => messages.findLast((m) => m.role === "assistant"),
+    () => messages.findLast((m: { role: string }) => m.role === "assistant"),
     [messages],
   )
 
@@ -1404,58 +1403,7 @@ function ChatViewInner({
     }
   }, [pendingQuestions, setPendingQuestions])
 
-  // Watch for pending auth retry message (after successful OAuth flow)
-  const [pendingAuthRetry, setPendingAuthRetry] = useAtom(
-    pendingAuthRetryMessageAtom,
-  )
 
-  useEffect(() => {
-    // Only retry when:
-    // 1. There's a pending message
-    // 2. readyToRetry is true (set by modal on OAuth success)
-    // 3. We're in the correct chat
-    // 4. Not currently streaming
-    if (
-      pendingAuthRetry &&
-      pendingAuthRetry.readyToRetry &&
-      pendingAuthRetry.subChatId === subChatId &&
-      !isStreaming
-    ) {
-      // Clear the pending message immediately to prevent double-sending
-      setPendingAuthRetry(null)
-
-      // Build message parts
-      const parts: Array<
-        { type: "text"; text: string } | { type: "data-image"; data: any }
-      > = [{ type: "text", text: pendingAuthRetry.prompt }]
-
-      // Add images if present
-      if (pendingAuthRetry.images && pendingAuthRetry.images.length > 0) {
-        for (const img of pendingAuthRetry.images) {
-          parts.push({
-            type: "data-image",
-            data: {
-              base64Data: img.base64Data,
-              mediaType: img.mediaType,
-              filename: img.filename,
-            },
-          })
-        }
-      }
-
-      // Send the message to Claude
-      sendMessage({
-        role: "user",
-        parts,
-      })
-    }
-  }, [
-    pendingAuthRetry,
-    isStreaming,
-    sendMessage,
-    setPendingAuthRetry,
-    subChatId,
-  ])
 
   const handlePlanApproval = useCallback(
     async (toolUseId: string, approved: boolean) => {
@@ -1635,16 +1583,8 @@ function ChatViewInner({
     ) {
       hasTriggeredAutoGenerateRef.current = true
       // Trigger rename for pre-populated initial message (from createAgentChat)
-      if (!hasTriggeredRenameRef.current && isFirstSubChat) {
-        const firstMsg = messages[0]
-        if (firstMsg?.role === "user") {
-          const textPart = firstMsg.parts?.find((p: any) => p.type === "text")
-          if (textPart && "text" in textPart) {
-            hasTriggeredRenameRef.current = true
-            onAutoRename(textPart.text, subChatId)
-          }
-        }
-      }
+      // Auto-rename is now handled by OpenCode via session-title events
+      // No need to trigger manual rename here
       regenerate()
     }
   }, [
@@ -1916,11 +1856,8 @@ function ChatViewInner({
       mode: isPlanModeRef.current ? "plan" : "agent",
     })
 
-    // Trigger auto-rename on first message in a new sub-chat
-    if (messagesLengthRef.current === 0 && !hasTriggeredRenameRef.current) {
-      hasTriggeredRenameRef.current = true
-      onAutoRename(text || "Image message", subChatId)
-    }
+    // Auto-rename is now handled by OpenCode via session-title events
+    // No need to trigger manual rename here
 
     // Build message parts: images first, then files, then text
     // Include base64Data for API transmission
@@ -2142,7 +2079,7 @@ function ChatViewInner({
         >
           <ChatTitleEditor
             name={subChatName}
-            placeholder="New Chat"
+            placeholder="New Session"
             onSave={handleRenameSubChat}
             isMobile={false}
             chatId={subChatId}
@@ -2160,7 +2097,7 @@ function ChatViewInner({
         tabIndex={-1}
         data-chat-container
       >
-        <div className="px-2 max-w-2xl mx-auto -mb-4 pb-8 space-y-4">
+        <div className="px-2 max-w-3xl mx-auto -mb-4 pb-8 space-y-4">
           <div>
             {/* ISOLATED: Messages rendered via Jotai atom subscription
                 Each component subscribes to specific atoms and only re-renders when those change */}
@@ -2184,7 +2121,7 @@ function ChatViewInner({
       {/* Only show if the pending question belongs to THIS sub-chat */}
       {pendingQuestions && pendingQuestions.subChatId === subChatId && (
         <div className="px-4 relative z-20">
-          <div className="w-full px-2 max-w-2xl mx-auto">
+          <div className="w-full px-2 max-w-3xl mx-auto">
             <AgentUserQuestion
               pendingQuestions={pendingQuestions}
               onAnswer={handleQuestionsAnswer}
@@ -2198,7 +2135,7 @@ function ChatViewInner({
       {(isStreaming || changedFilesForSubChat.length > 0) &&
         !(pendingQuestions?.subChatId === subChatId) && (
           <div className="px-2 -mb-6 relative z-0">
-            <div className="w-full max-w-2xl mx-auto px-2">
+            <div className="w-full max-w-3xl mx-auto px-2">
               <SubChatStatusCard
                 chatId={parentChatId}
                 isStreaming={isStreaming}
@@ -2847,7 +2784,7 @@ export function ChatView({
           : sc.updated_at?.toISOString()
       return {
         id: sc.id,
-        name: sc.name || "New Chat",
+        name: sc.name || "New Session",
         // Prefer DB timestamp, fall back to local timestamp, then current time
         created_at:
           createdAt ?? existingLocal?.created_at ?? new Date().toISOString(),
@@ -2870,7 +2807,7 @@ export function ChatView({
       if (!dbSubChatIds.has(id)) {
         allSubChats.push({
           id,
-          name: "New Chat",
+          name: "New Session",
           created_at: new Date().toISOString(),
         })
       }
@@ -2902,15 +2839,24 @@ export function ChatView({
         return null
       }
 
-      // Return existing chat if we have it
-      const existing = agentChatStore.get(subChatId)
-      if (existing) {
-        return existing
-      }
-
       // Find sub-chat data
       const subChat = agentSubChats.find((sc) => sc.id === subChatId)
       const messages = (subChat?.messages as any[]) || []
+
+      // Return existing chat if we have it AND it has messages OR the new data has no messages
+      // This ensures we recreate the chat when OpenCode loads historical messages
+      const existing = agentChatStore.get(subChatId)
+      if (existing) {
+        const existingMessageCount = existing.messages?.length || 0
+        const newMessageCount = messages.length
+        
+        // If existing chat is empty but new data has messages, recreate it
+        if (existingMessageCount === 0 && newMessageCount > 0) {
+          agentChatStore.delete(subChatId)
+        } else {
+          return existing
+        }
+      }
 
       // Get mode from store metadata (falls back to current isPlanMode)
       const subChatMeta = useAgentSubChatStore
@@ -3031,18 +2977,18 @@ export function ChatView({
     // Create sub-chat in DB first to get the real ID
     const newSubChat = await trpcClient.chats.createSubChat.mutate({
       chatId,
-      name: "New Chat",
+      name: "New Session",
       mode: subChatMode,
     })
     const newId = newSubChat.id
 
     // Track this subchat as just created for typewriter effect
-    setJustCreatedIds((prev) => new Set([...prev, newId]))
+    setJustCreatedIds((prev: Set<string>) => new Set([...prev, newId]))
 
     // Add to allSubChats with placeholder name
     store.addToAllSubChats({
       id: newId,
-      name: "New Chat",
+      name: "New Session",
       created_at: new Date().toISOString(),
       mode: subChatMode,
     })
@@ -3457,10 +3403,10 @@ export function ChatView({
             .getState()
             .updateSubChatName(subChatIdToUpdate, name)
           // Also update query cache so init effect doesn't overwrite
-          utils.agents.getAgentChat.setData({ chatId }, (old) => {
+          utils.agents.getAgentChat.setData({ chatId }, (old: any) => {
             if (!old) return old
             const existsInCache = old.subChats.some(
-              (sc) => sc.id === subChatIdToUpdate,
+              (sc: { id: string }) => sc.id === subChatIdToUpdate,
             )
             if (!existsInCache) {
               // Sub-chat not in cache yet (DB save still in flight) - add it
@@ -3483,7 +3429,7 @@ export function ChatView({
             }
             return {
               ...old,
-              subChats: old.subChats.map((sc) =>
+              subChats: old.subChats.map((sc: { id: string }) =>
                 sc.id === subChatIdToUpdate ? { ...sc, name } : sc,
               ),
             }
@@ -3494,9 +3440,9 @@ export function ChatView({
           // On desktop, selectedTeamId is always null, so we update unconditionally
           utils.agents.getAgentChats.setData(
             { teamId: selectedTeamId },
-            (old) => {
+            (old: any) => {
               if (!old) return old
-              return old.map((c) =>
+              return old.map((c: { id: string }) =>
                 c.id === chatIdToUpdate ? { ...c, name } : c,
               )
             },
@@ -3504,7 +3450,7 @@ export function ChatView({
           // Optimistic update for header (single chat query)
           utils.agents.getAgentChat.setData(
             { chatId: chatIdToUpdate },
-            (old) => {
+            (old: any) => {
               if (!old) return old
               return { ...old, name }
             },
@@ -3722,7 +3668,7 @@ export function ChatView({
 
               {/* Disabled input while loading */}
               <div className="px-2 pb-2">
-                <div className="w-full max-w-2xl mx-auto">
+                <div className="w-full max-w-3xl mx-auto">
                   <div className="relative w-full">
                     <PromptInput
                       className="border bg-input-background relative z-10 p-2 rounded-xl opacity-50 pointer-events-none"
@@ -4102,7 +4048,7 @@ export function ChatView({
                     ref={diffViewRef}
                     chatId={chatId}
                     sandboxId={sandboxId}
-                    worktreePath={worktreePath || undefined}
+                    worktreePath={worktreePath ?? undefined}
                     repository={repository}
                     onStatsChange={setDiffStats}
                     initialDiff={diffContent}

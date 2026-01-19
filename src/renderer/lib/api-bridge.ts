@@ -3,13 +3,98 @@
  * Wraps real tRPC calls and provides stubs for web-only features
  */
 
-import { useMemo } from "react"
+import { useMemo, useEffect, useState } from "react"
 import { trpc, trpcClient } from "./trpc"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyObj = Record<string, any>
+
+/**
+ * Load messages from OpenCode for subChats that have sessionIds
+ * Falls back to SQLite messages if OpenCode fails
+ */
+async function loadMessagesFromOpenCode(
+  subChats: AnyObj[],
+  chatWorktreePath: string | undefined,
+  projectPath: string | undefined,
+): Promise<Map<string, AnyObj[]>> {
+  const messagesMap = new Map<string, AnyObj[]>()
+  
+  // Use worktree path if available (sessions are tied to the directory they were created in)
+  // Fall back to project path
+  const directory = chatWorktreePath || projectPath
+  if (!directory) return messagesMap
+  
+  // Load messages for each subChat that has a sessionId
+  const promises = subChats
+    .filter((sc) => sc.sessionId)
+    .map(async (sc) => {
+      try {
+        const result = await trpcClient.opencode.getSessionMessages.query({
+          sessionId: sc.sessionId,
+          directory,
+        })
+        if (result.messages && result.messages.length > 0) {
+          messagesMap.set(sc.id, result.messages)
+        }
+      } catch {
+        // Ignore errors - will fall back to SQLite messages
+      }
+    })
+  
+  await Promise.all(promises)
+  return messagesMap
+}
+
+/**
+ * Parse and transform messages from SQLite JSON format
+ */
+function parseMessagesFromSQLite(messagesJson: string | null): AnyObj[] {
+  if (!messagesJson) return []
+  
+  try {
+    let parsedMessages = JSON.parse(messagesJson)
+    // Transform old tool-invocation parts to new tool-{toolName} format
+    parsedMessages = parsedMessages.map((msg: AnyObj) => {
+      if (!msg.parts) return msg
+      return {
+        ...msg,
+        parts: msg.parts.map((part: AnyObj) => {
+          // Migrate old "tool-invocation" type to "tool-{toolName}"
+          if (part.type === "tool-invocation" && part.toolName) {
+            return {
+              ...part,
+              type: `tool-${part.toolName}`,
+              toolCallId: part.toolCallId || part.toolInvocationId,
+              input: part.input || part.args,
+            }
+          }
+          // Normalize state field from DB format to AI SDK format
+          if (part.type?.startsWith("tool-") && part.state) {
+            let normalizedState = part.state
+            if (part.state === "result") {
+              normalizedState =
+                part.result?.success === false
+                  ? "output-error"
+                  : "output-available"
+            }
+            return {
+              ...part,
+              state: normalizedState,
+              output: part.output || part.result,
+            }
+          }
+          return part
+        }),
+      }
+    })
+    return parsedMessages
+  } catch {
+    return []
+  }
+}
 
 export const api = {
   agents: {
@@ -30,78 +115,63 @@ export const api = {
           { id: chatId! },
           { enabled: !!chatId && opts?.enabled !== false },
         )
+        
+        // State to hold messages loaded from OpenCode
+        const [openCodeMessages, setOpenCodeMessages] = useState<Map<string, AnyObj[]>>(new Map())
+        const [isLoadingOpenCode, setIsLoadingOpenCode] = useState(false)
+        
+        // Load messages from OpenCode when chat data is available
+        useEffect(() => {
+          if (!result.data?.subChats) return
+          // Need either worktreePath or project.path to fetch messages
+          if (!result.data?.worktreePath && !result.data?.project?.path) return
+          
+          const subChatsWithSessions = result.data.subChats.filter((sc: AnyObj) => sc.sessionId)
+          if (subChatsWithSessions.length === 0) return
+          
+          setIsLoadingOpenCode(true)
+          // Use worktreePath first (sessions are created in worktree dir), fall back to project path
+          loadMessagesFromOpenCode(
+            result.data.subChats,
+            result.data.worktreePath ?? undefined,
+            result.data.project?.path
+          )
+            .then((messages) => {
+              setOpenCodeMessages(messages)
+            })
+            .finally(() => setIsLoadingOpenCode(false))
+        }, [result.data?.subChats, result.data?.worktreePath, result.data?.project?.path])
 
         // Memoize transformation to prevent infinite re-renders
         const transformedData = useMemo(() => {
           if (!result.data) return null
+          
+          const mapped = result.data.subChats?.map((sc: AnyObj) => {
+            // Prefer messages from OpenCode if available, fall back to SQLite
+            const messages = openCodeMessages.get(sc.id) || parseMessagesFromSQLite(sc.messages)
+            
+            return {
+              ...sc,
+              created_at: sc.createdAt,
+              updated_at: sc.updatedAt,
+              messages,
+              stream_id: null,
+            }
+          })
+          
           return {
             ...result.data,
             // Desktop uses worktrees, not sandboxes
             sandbox_id: null,
             meta: null,
             // Map subChats to expected format
-            subChats: result.data.subChats?.map((sc: AnyObj) => {
-              let parsedMessages = []
-              try {
-                parsedMessages = sc.messages ? JSON.parse(sc.messages) : []
-                // Transform old tool-invocation parts to new tool-{toolName} format
-                parsedMessages = parsedMessages.map((msg: AnyObj) => {
-                  if (!msg.parts) return msg
-                  return {
-                    ...msg,
-                    parts: msg.parts.map((part: AnyObj) => {
-                      // Migrate old "tool-invocation" type to "tool-{toolName}"
-                      if (part.type === "tool-invocation" && part.toolName) {
-                        return {
-                          ...part,
-                          type: `tool-${part.toolName}`,
-                          toolCallId: part.toolCallId || part.toolInvocationId,
-                          input: part.input || part.args,
-                        }
-                      }
-                      // Normalize state field from DB format to AI SDK format
-                      // DB stores: "result", "call" -> AI SDK expects: "output-available", "call"
-                      if (part.type?.startsWith("tool-") && part.state) {
-                        let normalizedState = part.state
-                        if (part.state === "result") {
-                          // Check if it was an error result
-                          normalizedState =
-                            part.result?.success === false
-                              ? "output-error"
-                              : "output-available"
-                        }
-                        // Also add output field from result if present (for diff display)
-                        return {
-                          ...part,
-                          state: normalizedState,
-                          output: part.output || part.result,
-                        }
-                      }
-                      return part
-                    }),
-                  }
-                })
-              } catch {
-                console.warn(
-                  "[mock-api] Failed to parse messages for subChat:",
-                  sc.id,
-                )
-                parsedMessages = []
-              }
-              return {
-                ...sc,
-                created_at: sc.createdAt,
-                updated_at: sc.updatedAt,
-                messages: parsedMessages,
-                stream_id: null,
-              }
-            }),
+            subChats: mapped,
           }
-        }, [result.data])
+        }, [result.data, openCodeMessages])
 
         return {
           data: transformedData,
-          isLoading: result.isLoading,
+          isLoading: result.isLoading || isLoadingOpenCode,
         }
       },
     },
@@ -364,8 +434,8 @@ export const api = {
   },
   // Stubs for features not needed in desktop
   teams: {
-    getUserTeams: { useQuery: () => ({ data: [], isLoading: false }) },
-    getTeam: { useQuery: () => ({ data: null, isLoading: false }) },
+    getUserTeams: { useQuery: (_input?: unknown, _opts?: unknown) => ({ data: [], isLoading: false }) },
+    getTeam: { useQuery: (_input?: unknown, _opts?: unknown) => ({ data: null, isLoading: false }) },
     updateTeam: {
       useMutation: () => ({
         mutate: () => {},
@@ -453,7 +523,7 @@ export const api = {
         }
       },
     },
-    getSlashCommands: { useQuery: () => ({ data: [], isLoading: false }) },
+    getSlashCommands: { useQuery: (_input?: unknown, _opts?: unknown) => ({ data: [] as Array<{ id: string; name: string; command: string; description: string; path?: string; repository?: string; category: "builtin" | "repository" }>, isLoading: false }) },
     getUserInstallations: { useQuery: () => ({ data: [], isLoading: false }) },
     getGithubConnection: {
       useQuery: () => ({ data: { isConnected: false }, isLoading: false }),

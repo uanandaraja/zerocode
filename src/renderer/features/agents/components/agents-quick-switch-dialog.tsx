@@ -11,11 +11,13 @@ interface AgentsQuickSwitchDialogProps {
   isOpen: boolean
   chats: Array<{
     id: string
-    name: string
-    meta: any
-    sandbox_id: string | null
-    updated_at: Date
+    name: string | null
     projectId: string
+    updatedAt?: Date | null
+    // Legacy web fields (optional for backwards compatibility)
+    meta?: any
+    sandbox_id?: string | null
+    updated_at?: Date
   }>
   selectedIndex: number
   projectsMap: Map<string, { gitOwner?: string | null; gitProvider?: string | null; gitRepo?: string | null; name: string }>

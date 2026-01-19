@@ -33,7 +33,7 @@ function areTitlePropsEqual(
 
 export const ChatTitleEditor = memo(function ChatTitleEditor({
   name,
-  placeholder = "New Chat",
+  placeholder = "New Session",
   onSave,
   isMobile = false,
   disabled = false,
@@ -147,7 +147,7 @@ export const ChatTitleEditor = memo(function ChatTitleEditor({
   return (
     <div
       ref={containerRef}
-      className={cn("max-w-2xl mx-auto px-4", heightClass)}
+      className={cn("max-w-3xl mx-auto px-4", heightClass)}
     >
       {isEditing ? (
         <input

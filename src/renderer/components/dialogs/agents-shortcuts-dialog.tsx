@@ -91,7 +91,7 @@ function getAgentShortcuts(
   return [
     // Creation & Management (mirrors Workspaces order)
     { label: "Create new agent", keys: ["cmd", "T"] },
-    { label: "Search chats", keys: ["/"] },
+    { label: "Search sessions", keys: ["/"] },
     { label: "Archive current agent", keys: ["cmd", "W"] },
     // Navigation
     {

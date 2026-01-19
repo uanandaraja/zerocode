@@ -74,7 +74,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../../components/ui/alert-dialog"
-import { api } from "../../lib/mock-api"
+import { api } from "../../lib/api-bridge"
 import { trpcClient } from "../../lib/trpc"
 import { toast } from "sonner"
 import { AgentsRenameSubChatDialog } from "../agents/components/agents-rename-subchat-dialog"
@@ -95,6 +95,8 @@ interface SidebarSearchHistoryPopoverProps {
   pendingQuestions: { subChatId: string } | null
   allSubChatsLength: number
   onSelect: (subChat: SubChatMeta) => void
+  isOpen?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 const SidebarSearchHistoryPopover = memo(function SidebarSearchHistoryPopover({
@@ -104,8 +106,13 @@ const SidebarSearchHistoryPopover = memo(function SidebarSearchHistoryPopover({
   pendingQuestions,
   allSubChatsLength,
   onSelect,
+  isOpen: controlledIsOpen,
+  onOpenChange: controlledOnOpenChange,
 }: SidebarSearchHistoryPopoverProps) {
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [internalIsOpen, setInternalIsOpen] = useState(false)
+  // Support both controlled and uncontrolled modes
+  const isHistoryOpen = controlledIsOpen ?? internalIsOpen
+  const setIsHistoryOpen = controlledOnOpenChange ?? setInternalIsOpen
 
   const renderItem = useCallback((subChat: SubChatMeta) => {
     const timeAgo = formatTimeAgo(subChat.updated_at || subChat.created_at)
@@ -133,7 +140,7 @@ const SidebarSearchHistoryPopover = memo(function SidebarSearchHistoryPopover({
           )}
         </div>
         <span className="text-sm truncate flex-1">
-          {subChat.name || "New Chat"}
+          {subChat.name || "New Session"}
         </span>
         <span className="text-sm text-muted-foreground whitespace-nowrap">
           {timeAgo}
@@ -148,9 +155,9 @@ const SidebarSearchHistoryPopover = memo(function SidebarSearchHistoryPopover({
       onOpenChange={setIsHistoryOpen}
       items={sortedSubChats}
       onSelect={onSelect}
-      placeholder="Search chats..."
+      placeholder="Search sessions..."
       emptyMessage="No results"
-      getItemValue={(subChat) => `${subChat.name || "New Chat"} ${subChat.id}`}
+      getItemValue={(subChat) => `${subChat.name || "New Session"} ${subChat.id}`}
       renderItem={renderItem}
       side="bottom"
       align="end"
@@ -250,7 +257,7 @@ export function AgentsSubChatsSidebar({
   )
   const pendingPlanApprovals = useMemo(() => {
     const set = new Set<string>()
-    if (pendingPlanApprovalsData) {
+    if (Array.isArray(pendingPlanApprovalsData)) {
       for (const { subChatId } of pendingPlanApprovalsData) {
         set.add(subChatId)
       }
@@ -269,6 +276,8 @@ export function AgentsSubChatsSidebar({
     null,
   )
   const [renameLoading, setRenameLoading] = useState(false)
+  // History popover state - lifted here to allow control from handleSelectFromHistory
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [showTopGradient, setShowTopGradient] = useState(false)
   const [showBottomGradient, setShowBottomGradient] = useState(false)
   // Using ref instead of state to avoid re-renders on hover
@@ -609,7 +618,7 @@ export function AgentsSubChatsSidebar({
       useAgentSubChatStore.getState().updateSubChatName(subChatId, newName)
 
       // Remove from justCreatedIds to prevent typewriter animation on manual rename
-      setJustCreatedIds((prev) => {
+      setJustCreatedIds((prev: Set<string>) => {
         if (prev.has(subChatId)) {
           const next = new Set(prev)
           next.delete(subChatId)
@@ -629,7 +638,7 @@ export function AgentsSubChatsSidebar({
         // Rollback on error
         useAgentSubChatStore
           .getState()
-          .updateSubChatName(subChatId, oldName || "New Chat")
+          .updateSubChatName(subChatId, oldName || "New Session")
       } finally {
         setRenameLoading(false)
         setRenamingSubChat(null)
@@ -646,18 +655,18 @@ export function AgentsSubChatsSidebar({
     // Create sub-chat in DB first to get the real ID
     const newSubChat = await trpcClient.chats.createSubChat.mutate({
       chatId: parentChatId,
-      name: "New Chat",
+      name: "New Session",
       mode: "agent",
     })
     const newId = newSubChat.id
 
     // Track this subchat as just created for typewriter effect
-    setJustCreatedIds((prev) => new Set([...prev, newId]))
+    setJustCreatedIds((prev: Set<string>) => new Set([...prev, newId]))
 
     // Add to allSubChats with placeholder name
     store.addToAllSubChats({
       id: newId,
-      name: "New Chat",
+      name: "New Session",
       created_at: new Date().toISOString(),
       mode: "agent",
     })
@@ -950,6 +959,8 @@ export function AgentsSubChatsSidebar({
         pendingQuestions={pendingQuestions}
         allSubChatsLength={allSubChats.length}
         onSelect={handleSelectFromHistory}
+        isOpen={isHistoryOpen}
+        onOpenChange={setIsHistoryOpen}
       />
       <Tooltip delayDuration={500}>
         <TooltipTrigger asChild>
@@ -1050,7 +1061,7 @@ export function AgentsSubChatsSidebar({
           <div className="relative">
             <Input
               ref={searchInputRef}
-              placeholder="Search chats..."
+              placeholder="Search sessions..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -1095,7 +1106,7 @@ export function AgentsSubChatsSidebar({
               className="h-7 w-full rounded-lg text-sm bg-muted border border-input placeholder:text-muted-foreground/40"
             />
           </div>
-          {/* New Chat Button */}
+          {/* New Session Button */}
           <Tooltip delayDuration={500}>
             <TooltipTrigger asChild>
               <Button
@@ -1104,7 +1115,7 @@ export function AgentsSubChatsSidebar({
                 size="sm"
                 className="h-7 px-2 w-full hover:bg-foreground/10 transition-[background-color,transform] duration-150 ease-out active:scale-[0.97] text-foreground rounded-lg"
               >
-                <span className="text-sm font-medium">New Chat</span>
+                <span className="text-sm font-medium">New Session</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right">
@@ -1221,7 +1232,7 @@ export function AgentsSubChatsSidebar({
                                     hoveredChatIndexRef.current = globalIndex
                                     handleSubChatMouseEnter(
                                       subChat.id,
-                                      subChat.name || "New Chat",
+                                      subChat.name || "New Session",
                                       e.currentTarget,
                                     )
                                   }}
@@ -1317,7 +1328,7 @@ export function AgentsSubChatsSidebar({
                                         >
                                           <TypewriterText
                                             text={subChat.name || ""}
-                                            placeholder="New Chat"
+                                            placeholder="New Session"
                                             id={subChat.id}
                                             isJustCreated={justCreatedIds.has(subChat.id)}
                                             showPlaceholder={true}
@@ -1429,7 +1440,7 @@ export function AgentsSubChatsSidebar({
                         )}
                       >
                         <h3 className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-                          {pinnedChats.length > 0 ? "Recent chats" : "Chats"}
+                          {pinnedChats.length > 0 ? "Recent sessions" : "Sessions"}
                         </h3>
                       </div>
                       <div className="list-none p-0 m-0">
@@ -1494,7 +1505,7 @@ export function AgentsSubChatsSidebar({
                                     hoveredChatIndexRef.current = globalIndex
                                     handleSubChatMouseEnter(
                                       subChat.id,
-                                      subChat.name || "New Chat",
+                                      subChat.name || "New Session",
                                       e.currentTarget,
                                     )
                                   }}
@@ -1590,7 +1601,7 @@ export function AgentsSubChatsSidebar({
                                         >
                                           <TypewriterText
                                             text={subChat.name || ""}
-                                            placeholder="New Chat"
+                                            placeholder="New Session"
                                             id={subChat.id}
                                             isJustCreated={justCreatedIds.has(subChat.id)}
                                             showPlaceholder={true}

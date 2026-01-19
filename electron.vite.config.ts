@@ -22,6 +22,7 @@ export default defineConfig({
           "better-sqlite3",
           "@prisma/client",
           "@anthropic-ai/claude-agent-sdk", // ESM module - must use dynamic import
+          "@opencode-ai/sdk", // ESM module - must use dynamic import
         ],
         output: {
           format: "cjs",
@@ -58,7 +59,6 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, "src/renderer/index.html"),
-          login: resolve(__dirname, "src/renderer/login.html"),
         },
       },
     },

@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { router, publicProcedure } from "../index"
-import { getDatabase, chats, subChats, projects } from "../../db"
+import { getDatabase, workspaces, sessions, projects, chats, subChats } from "../../db"
 import { eq, desc, isNull, isNotNull, inArray, and } from "drizzle-orm"
 import {
   createWorktreeForChat,
@@ -10,7 +10,6 @@ import {
 } from "../../git"
 import { execWithShellEnv } from "../../git/shell-env"
 import simpleGit from "simple-git"
-import { getAuthManager, getBaseUrl } from "../../../index"
 import {
   trackWorkspaceCreated,
   trackWorkspaceArchived,
@@ -25,6 +24,52 @@ function getFallbackName(userMessage: string): string {
     return trimmed || "New Chat"
   }
   return trimmed.substring(0, 25) + "..."
+}
+
+// Generate a concise name from user message locally
+// Extracts key action/topic from the message
+function generateLocalName(userMessage: string): string {
+  const trimmed = userMessage.trim()
+  if (!trimmed) return "New Chat"
+  
+  // Remove common filler words and clean up
+  const fillerWords = new Set([
+    'please', 'can', 'could', 'would', 'you', 'help', 'me', 'i', 'want', 'to',
+    'need', 'the', 'a', 'an', 'this', 'that', 'with', 'for', 'and', 'or', 'but',
+    'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
+    'do', 'does', 'did', 'will', 'shall', 'should', 'may', 'might', 'must',
+    'let', 'make', 'just', 'now', 'here', 'there', 'what', 'how', 'why', 'when',
+    'where', 'which', 'who', 'whom', 'whose', 'if', 'then', 'else', 'so', 'very',
+    'really', 'actually', 'basically', 'essentially', 'simply', 'some', 'any',
+    'all', 'each', 'every', 'both', 'few', 'more', 'most', 'other', 'such'
+  ])
+  
+  // Get first sentence or up to first newline
+  const firstLine = trimmed.split(/[\n.!?]/)[0] || trimmed
+  
+  // Extract meaningful words
+  const words = firstLine
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 1 && !fillerWords.has(word))
+  
+  if (words.length === 0) {
+    return getFallbackName(trimmed)
+  }
+  
+  // Capitalize first letter of each word and join
+  const name = words
+    .slice(0, 5) // Take first 5 meaningful words
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+  
+  // Truncate if too long
+  if (name.length > 40) {
+    return name.substring(0, 37) + "..."
+  }
+  
+  return name || "New Chat"
 }
 
 export const chatsRouter = router({
@@ -79,7 +124,7 @@ export const chatsRouter = router({
       const chatSubChats = db
         .select()
         .from(subChats)
-        .where(eq(subChats.chatId, input.id))
+        .where(eq(subChats.workspaceId, input.id))
         .orderBy(subChats.createdAt)
         .all()
 
@@ -123,7 +168,6 @@ export const chatsRouter = router({
       }),
     )
     .mutation(async ({ input }) => {
-      console.log("[chats.create] called with:", input)
       const db = getDatabase()
 
       // Get project path
@@ -132,7 +176,6 @@ export const chatsRouter = router({
         .from(projects)
         .where(eq(projects.id, input.projectId))
         .get()
-      console.log("[chats.create] found project:", project)
       if (!project) throw new Error("Project not found")
 
       // Create chat (fast path)
@@ -141,7 +184,6 @@ export const chatsRouter = router({
         .values({ name: input.name, projectId: input.projectId })
         .returning()
         .get()
-      console.log("[chats.create] created chat:", chat)
 
       // Create initial sub-chat with user message (AI SDK format)
       // If initialMessageParts is provided, use it; otherwise fallback to text-only message
@@ -168,13 +210,12 @@ export const chatsRouter = router({
       const subChat = db
         .insert(subChats)
         .values({
-          chatId: chat.id,
+          workspaceId: chat.id,
           mode: input.mode,
           messages: initialMessages,
         })
         .returning()
         .get()
-      console.log("[chats.create] created subChat:", subChat)
 
       // Worktree creation result (will be set if useWorktree is true)
       let worktreeResult: {
@@ -185,17 +226,12 @@ export const chatsRouter = router({
 
       // Only create worktree if useWorktree is true
       if (input.useWorktree) {
-        console.log(
-          "[chats.create] creating worktree with baseBranch:",
-          input.baseBranch,
-        )
         const result = await createWorktreeForChat(
           project.path,
           project.id,
           chat.id,
           input.baseBranch,
         )
-        console.log("[chats.create] worktree result:", result)
 
         if (result.success && result.worktreePath) {
           db.update(chats)
@@ -222,7 +258,6 @@ export const chatsRouter = router({
         }
       } else {
         // Local mode: use project path directly, no branch info
-        console.log("[chats.create] local mode - using project path directly")
         db.update(chats)
           .set({ worktreePath: project.path })
           .where(eq(chats.id, chat.id))
@@ -245,7 +280,6 @@ export const chatsRouter = router({
         useWorktree: input.useWorktree,
       })
 
-      console.log("[chats.create] returning:", response)
       return response
     }),
 
@@ -367,7 +401,7 @@ export const chatsRouter = router({
       const chat = db
         .select()
         .from(chats)
-        .where(eq(chats.id, subChat.chatId))
+        .where(eq(chats.id, subChat.workspaceId))
         .get()
 
       const project = chat
@@ -397,7 +431,7 @@ export const chatsRouter = router({
       return db
         .insert(subChats)
         .values({
-          chatId: input.chatId,
+          workspaceId: input.chatId,
           name: input.name,
           mode: input.mode,
           messages: "[]",
@@ -510,58 +544,16 @@ export const chatsRouter = router({
     }),
 
   /**
-   * Generate a name for a sub-chat using AI (calls web API)
-   * Always uses production API since it's a lightweight call
+   * Generate a name for a sub-chat
+   * @deprecated Chat names are now auto-generated by OpenCode via session-title events.
+   * This procedure is kept for backward compatibility but just uses local text processing.
    */
   generateSubChatName: publicProcedure
     .input(z.object({ userMessage: z.string() }))
-    .mutation(async ({ input }) => {
-      try {
-        const authManager = getAuthManager()
-        const token = await authManager.getValidToken()
-        // Always use production API for name generation
-        const apiUrl = "https://21st.dev"
-
-        console.log(
-          "[generateSubChatName] Calling API with token:",
-          token ? "present" : "missing",
-        )
-        console.log(
-          "[generateSubChatName] URL:",
-          `${apiUrl}/api/agents/sub-chat/generate-name`,
-        )
-
-        const response = await fetch(
-          `${apiUrl}/api/agents/sub-chat/generate-name`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token && { "X-Desktop-Token": token }),
-            },
-            body: JSON.stringify({ userMessage: input.userMessage }),
-          },
-        )
-
-        console.log("[generateSubChatName] Response status:", response.status)
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error(
-            "[generateSubChatName] API error:",
-            response.status,
-            errorText,
-          )
-          return { name: getFallbackName(input.userMessage) }
-        }
-
-        const data = await response.json()
-        console.log("[generateSubChatName] Generated name:", data.name)
-        return { name: data.name || getFallbackName(input.userMessage) }
-      } catch (error) {
-        console.error("[generateSubChatName] Error:", error)
-        return { name: getFallbackName(input.userMessage) }
-      }
+    .mutation(({ input }) => {
+      // OpenCode auto-generates session titles which are sent via session-title chunks.
+      // This is just a fallback for any code that still calls this procedure.
+      return { name: generateLocalName(input.userMessage) }
     }),
 
   // ============ PR-related procedures ============
@@ -727,7 +719,7 @@ export const chatsRouter = router({
         messages: subChats.messages,
       })
       .from(chats)
-      .leftJoin(subChats, eq(subChats.chatId, chats.id))
+      .leftJoin(subChats, eq(subChats.workspaceId, chats.id))
       .where(isNull(chats.archivedAt))
       .all()
       // Filter by open sub-chats if provided
@@ -858,7 +850,7 @@ export const chatsRouter = router({
         messages: subChats.messages,
       })
       .from(chats)
-      .leftJoin(subChats, eq(subChats.chatId, chats.id))
+      .leftJoin(subChats, eq(subChats.workspaceId, chats.id))
       .where(isNull(chats.archivedAt))
       .all()
       // Filter by open sub-chats if provided

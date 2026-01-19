@@ -110,7 +110,7 @@ function SubChatCard({
               isSelected ? "text-primary-foreground" : "text-foreground",
             )}
           >
-            {subChat.name || "New Chat"}
+            {subChat.name || "New Session"}
           </span>
           {/* Time and stats */}
           <div className="flex items-center gap-1.5 text-[11px]">
