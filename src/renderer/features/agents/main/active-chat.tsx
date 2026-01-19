@@ -798,7 +798,7 @@ function CollapsibleSteps({
           </div>
         </button>
       </div>
-      {isExpanded && <div className="mt-1 space-y-1.5">{children}</div>}
+      {isExpanded && <div className="mt-2 space-y-3">{children}</div>}
     </div>
   )
 }

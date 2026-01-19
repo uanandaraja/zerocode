@@ -12,6 +12,8 @@ import { MemoizedTextPart } from "./memoized-text-part"
 import { AgentBashTool } from "../ui/agent-bash-tool"
 import { AgentEditTool } from "../ui/agent-edit-tool"
 import { AgentReadTool } from "../ui/agent-read-tool"
+import { AgentGrepTool } from "../ui/agent-grep-tool"
+import { AgentGlobTool } from "../ui/agent-glob-tool"
 import { AgentTaskTool } from "../ui/agent-task-tool"
 import { AgentThinkingTool } from "../ui/agent-thinking-tool"
 import { AgentPlanTool } from "../ui/agent-plan-tool"
@@ -116,7 +118,7 @@ function CollapsibleSteps({
           </div>
         </button>
       </div>
-      {isExpanded && <div className="mt-1 space-y-1.5">{children}</div>}
+      {isExpanded && <div className="mt-2 space-y-3">{children}</div>}
     </div>
   )
 }
@@ -357,7 +359,9 @@ export const AssistantMessageItem = memo(function AssistantMessageItem({
               input: { subagent_type: "unknown-agent", description: "Incomplete task" },
             }}
             nestedTools={group.parts}
+            nestedToolsMap={nestedToolsMap}
             chatStatus={status}
+            subChatId={subChatId}
           />
         )
       }
@@ -384,7 +388,7 @@ export const AssistantMessageItem = memo(function AssistantMessageItem({
 
     if (part.type === "tool-Task") {
       const nestedTools = nestedToolsMap.get(part.toolCallId) || []
-      return <AgentTaskTool key={idx} part={part} nestedTools={nestedTools} chatStatus={status} />
+      return <AgentTaskTool key={idx} part={part} nestedTools={nestedTools} nestedToolsMap={nestedToolsMap} chatStatus={status} subChatId={subChatId} />
     }
 
     if (part.type === "tool-Bash") return <AgentBashTool key={idx} part={part} chatStatus={status} />
@@ -392,6 +396,8 @@ export const AssistantMessageItem = memo(function AssistantMessageItem({
     if (part.type === "tool-Edit") return <AgentEditTool key={idx} part={part} chatStatus={status} />
     if (part.type === "tool-Write") return <AgentEditTool key={idx} part={part} chatStatus={status} />
     if (part.type === "tool-Read") return <AgentReadTool key={idx} part={part} chatStatus={status} />
+    if (part.type === "tool-Grep") return <AgentGrepTool key={idx} part={part} chatStatus={status} />
+    if (part.type === "tool-Glob") return <AgentGlobTool key={idx} part={part} chatStatus={status} />
     if (part.type === "tool-WebSearch") return <AgentWebSearchCollapsible key={idx} part={part} chatStatus={status} />
     if (part.type === "tool-WebFetch") return <AgentWebFetchTool key={idx} part={part} chatStatus={status} />
     if (part.type === "tool-PlanWrite") return <AgentPlanTool key={idx} part={part} chatStatus={status} />
@@ -463,7 +469,7 @@ export const AssistantMessageItem = memo(function AssistantMessageItem({
       data-assistant-message-id={message.id}
       className="group/message w-full mb-4"
     >
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-3">
         {(hasFinalText || hasPlan) && visibleStepsCount > 0 && (
           <CollapsibleSteps stepsCount={visibleStepsCount}>
             {(() => {

@@ -125,8 +125,8 @@ export function areToolPropsEqual(
  * Compare function for AgentTaskTool which has additional nestedTools prop.
  */
 export function areTaskToolPropsEqual(
-  prevProps: { part: any; nestedTools: any[]; chatStatus?: string },
-  nextProps: { part: any; nestedTools: any[]; chatStatus?: string },
+  prevProps: { part: any; nestedTools: any[]; nestedToolsMap?: Map<string, any[]>; chatStatus?: string },
+  nextProps: { part: any; nestedTools: any[]; nestedToolsMap?: Map<string, any[]>; chatStatus?: string },
 ): boolean {
   // Compare main part first
   if (!arePartsEqual(prevProps.part, nextProps.part)) return false
