@@ -135,6 +135,28 @@ export function createOpenCodeTransformer() {
         break
       }
 
+      case "question.asked": {
+        // Question tool is asking the user for input
+        const questionRequest = event.properties
+        yield {
+          type: "ask-user-question",
+          toolUseId: questionRequest.id, // Use requestID as toolUseId
+          questions: questionRequest.questions.map(q => ({
+            question: q.question,
+            header: q.header,
+            options: q.options || [],
+            multiSelect: q.multiple ?? false, // SDK uses "multiple", renderer uses "multiSelect"
+          })),
+        }
+        break
+      }
+
+      case "question.replied":
+      case "question.rejected":
+        // Question was answered or rejected - UI will clear pending question
+        // The tool output will come through message.part.updated
+        break
+
       case "todo.updated": {
         // We could emit todo updates as a special chunk type
         // For now, we don't have a UI for this
@@ -264,7 +286,26 @@ function* transformPart(
             type: "tool-input-available",
             toolCallId,
             toolName,
-            input: toolPart.state.input,
+            input: toolPart.tool === "question" 
+              ? transformQuestionInput(toolPart.state.input)
+              : toolPart.state.input,
+          }
+          
+          // For question tool, also emit ask-user-question to trigger interactive UI
+          if (toolPart.tool === "question" && toolPart.state.input) {
+            const questionInput = toolPart.state.input as { questions?: Array<{ question: string; header: string; options: Array<{ label: string; description: string }>; multiple?: boolean }> }
+            if (questionInput.questions && Array.isArray(questionInput.questions)) {
+              yield {
+                type: "ask-user-question",
+                toolUseId: toolCallId,
+                questions: questionInput.questions.map(q => ({
+                  question: q.question,
+                  header: q.header,
+                  options: q.options || [],
+                  multiSelect: q.multiple ?? false, // SDK uses "multiple", renderer uses "multiSelect"
+                })),
+              }
+            }
           }
           break
 
@@ -274,7 +315,9 @@ function* transformPart(
             type: "tool-input-available",
             toolCallId,
             toolName,
-            input: toolPart.state.input,
+            input: toolPart.tool === "question" 
+              ? transformQuestionInput(toolPart.state.input)
+              : toolPart.state.input,
           }
           yield {
             type: "tool-output-available",
@@ -288,7 +331,9 @@ function* transformPart(
             type: "tool-input-available",
             toolCallId,
             toolName,
-            input: toolPart.state.input,
+            input: toolPart.tool === "question" 
+              ? transformQuestionInput(toolPart.state.input)
+              : toolPart.state.input,
           }
           yield {
             type: "tool-output-error",
@@ -376,6 +421,23 @@ function mapToolName(tool: string): string {
     skill: "Skill",
   }
   return mapping[tool.toLowerCase()] || tool
+}
+
+// Transform question tool input to use multiSelect instead of multiple
+function transformQuestionInput(input: unknown): unknown {
+  if (!input || typeof input !== "object") return input
+  const questionInput = input as { questions?: Array<{ question: string; header: string; options: Array<{ label: string; description: string }>; multiple?: boolean }> }
+  if (!questionInput.questions || !Array.isArray(questionInput.questions)) return input
+  
+  return {
+    ...questionInput,
+    questions: questionInput.questions.map(q => ({
+      question: q.question,
+      header: q.header,
+      options: q.options || [],
+      multiSelect: q.multiple ?? false, // Map SDK's "multiple" to renderer's "multiSelect"
+    })),
+  }
 }
 
 // Parse tool output from string to structured format
@@ -531,7 +593,9 @@ function transformPartToUIPart(part: Part): UIMessagePart | null {
         toolCallId,
         toolName,
         state,
-        input: toolPart.state.input,
+        input: toolPart.tool === "question" 
+          ? transformQuestionInput(toolPart.state.input)
+          : toolPart.state.input,
         output,
       }
     }

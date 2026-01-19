@@ -73,6 +73,17 @@ export const AgentAskUserQuestionTool = memo(function AgentAskUserQuestionTool({
   const isCompleted =
     state === "result" && answers && !isSkipped && !isTimedOut && !isError
 
+  // Show error state first (even if still in "call" state with an error)
+  if (isError) {
+    return (
+      <div className="flex items-center gap-2 py-1 px-2 text-xs text-muted-foreground">
+        <span>Question</span>
+        <span className="text-muted-foreground/50">•</span>
+        <span className="text-red-500 break-all">{effectiveErrorText || "Error"}</span>
+      </div>
+    )
+  }
+
   // Show loading state if:
   // 1. No questions yet (still streaming input)
   // 2. Streaming but dialog not yet shown (waiting for ask-user-question chunk)
@@ -98,16 +109,7 @@ export const AgentAskUserQuestionTool = memo(function AgentAskUserQuestionTool({
     )
   }
 
-  // Show error state
-  if (state === "result" && isError) {
-    return (
-      <div className="flex items-center gap-2 py-1 px-2 text-xs text-muted-foreground">
-        <span>Question</span>
-        <span className="text-muted-foreground/50">•</span>
-        <span className="text-red-500">{effectiveErrorText || "Error"}</span>
-      </div>
-    )
-  }
+  // Note: Error state is handled at the top of the component
 
   // Show completed state with card layout
   if (isCompleted && answers) {

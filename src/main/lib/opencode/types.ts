@@ -73,6 +73,23 @@ export type {
   EventTodoUpdated,
 }
 
+// Question request type from SDK
+export type QuestionRequest = {
+  id: string
+  sessionID: string
+  questions: Array<{
+    question: string
+    header: string
+    options: Array<{ label: string; description: string }>
+    multiple?: boolean
+    custom?: boolean
+  }>
+  tool?: {
+    messageID: string
+    callID: string
+  }
+}
+
 // OpenCode event union type
 export type OpenCodeEvent =
   | { type: "server.connected"; properties: Record<string, unknown> }
@@ -88,6 +105,9 @@ export type OpenCodeEvent =
   | { type: "session.error"; properties: { sessionID?: string; error?: unknown } }
   | { type: "permission.updated"; properties: import("@opencode-ai/sdk").Permission }
   | { type: "permission.replied"; properties: { sessionID: string; permissionID: string; response: string } }
+  | { type: "question.asked"; properties: QuestionRequest }
+  | { type: "question.replied"; properties: { sessionID: string; requestID: string; answers: Array<Array<string>> } }
+  | { type: "question.rejected"; properties: { sessionID: string; requestID: string } }
   | { type: "todo.updated"; properties: { sessionID: string; todos: import("@opencode-ai/sdk").Todo[] } }
   | { type: "file.edited"; properties: { file: string } }
 

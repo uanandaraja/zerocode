@@ -926,12 +926,9 @@ const SidebarHeader = memo(function SidebarHeader({
                   suppressHydrationWarning
                 >
                   <div className="flex items-center gap-1.5 min-w-0 max-w-full">
-                    <div className="flex items-center justify-center flex-shrink-0">
-                      <Logo className="w-3.5 h-3.5" />
-                    </div>
                     <div className="min-w-0 flex-1 overflow-hidden">
                       <div className="text-sm font-medium text-foreground truncate">
-                        1Code
+                        zerocode
                       </div>
                     </div>
                     <ChevronDown

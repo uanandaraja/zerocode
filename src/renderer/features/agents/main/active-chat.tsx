@@ -1180,11 +1180,8 @@ function ChatViewInner({
     // Mark as manually aborted to prevent completion sound
     agentChatStore.setManuallyAborted(subChatId, true)
     await stopRef.current()
-    // Call DELETE endpoint to cancel server-side stream
-    await fetch(
-      `/api/agents/chat?id=${encodeURIComponent(subChatId)}`,
-      { method: "DELETE", credentials: "include" },
-    )
+    // Cancel the OpenCode session on the server side
+    await trpcClient.opencode.cancel.mutate({ subChatId })
   }, [subChatId])
 
   // Keep refs updated for scroll save cleanup to use
@@ -1553,11 +1550,8 @@ function ChatViewInner({
         // Mark as manually aborted to prevent completion sound
         agentChatStore.setManuallyAborted(subChatId, true)
         await stop()
-        // Call DELETE endpoint to cancel server-side stream
-        await fetch(`/api/agents/chat?id=${encodeURIComponent(subChatId)}`, {
-          method: "DELETE",
-          credentials: "include",
-        })
+        // Cancel the OpenCode session on the server side
+        await trpcClient.opencode.cancel.mutate({ subChatId })
       }
     }
 

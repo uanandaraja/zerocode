@@ -332,7 +332,9 @@ export const opencodeRouter = router({
     }),
 
   /**
-   * Respond to tool approval (legacy API compatibility)
+   * Respond to question tool or tool approval
+   * For questions: toolUseId is the question requestID
+   * For approvals: toolUseId is the permission ID
    */
   respondToolApproval: publicProcedure
     .input(
@@ -344,14 +346,46 @@ export const opencodeRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      // This maps to OpenCode's permission system
-      // toolUseId is the permission ID
       const client = serverManager.getClient()
       if (!client) {
         throw new Error("OpenCode server not running")
       }
 
-      // TODO: Implement tool approval via OpenCode's permission system
+      // Check if this is a question response (updatedInput has answers)
+      const questionAnswers = input.updatedInput as { answers?: Record<string, string> } | undefined
+      if (input.approved && questionAnswers?.answers) {
+        // This is a question response - use question API
+        // Convert { question: answer } format to array of selected labels
+        const answers = Object.values(questionAnswers.answers).map(answer => {
+          // Each answer is a comma-separated list of selected labels
+          return answer.split(", ").filter(Boolean)
+        })
+        
+        try {
+          await client.question.reply({
+            path: { requestID: input.toolUseId },
+            body: { answers },
+          })
+        } catch (e) {
+          // Question may have already been answered or timed out
+          console.warn("[OpenCode] Failed to reply to question:", e)
+        }
+        return { ok: true }
+      }
+
+      // Question was rejected/skipped
+      if (!input.approved) {
+        try {
+          await client.question.reject({
+            path: { requestID: input.toolUseId },
+          })
+        } catch (e) {
+          // Question may have already been answered or timed out
+          console.warn("[OpenCode] Failed to reject question:", e)
+        }
+        return { ok: true }
+      }
+
       return { ok: true }
     }),
 
@@ -409,6 +443,11 @@ function getSessionIdFromEvent(event: OpenCodeEvent): string | null {
     case "permission.updated":
       return event.properties.sessionID
     case "permission.replied":
+      return event.properties.sessionID
+    case "question.asked":
+      return event.properties.sessionID
+    case "question.replied":
+    case "question.rejected":
       return event.properties.sessionID
     case "todo.updated":
       return event.properties.sessionID
