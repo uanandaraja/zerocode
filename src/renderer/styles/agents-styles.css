@@ -261,3 +261,13 @@ body:has([data-agents-page]) .canvas-dialog,
   --line-height: 1.5;
   font-family: "Monaco", "Menlo", "Consolas", monospace;
 }
+
+/* Hide "N unmodified lines" separators in inline edit preview */
+.agent-edit-diff-wrapper [data-separator] {
+  display: none !important;
+}
+
+/* Hide "No newline at end of file" in inline edit preview */
+.agent-edit-diff-wrapper [data-no-newline] {
+  display: none !important;
+}

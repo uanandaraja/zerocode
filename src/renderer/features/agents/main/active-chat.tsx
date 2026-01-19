@@ -2097,7 +2097,7 @@ function ChatViewInner({
         tabIndex={-1}
         data-chat-container
       >
-        <div className="px-2 max-w-2xl mx-auto -mb-4 pb-8 space-y-4">
+        <div className="px-2 max-w-3xl mx-auto -mb-4 pb-8 space-y-4">
           <div>
             {/* ISOLATED: Messages rendered via Jotai atom subscription
                 Each component subscribes to specific atoms and only re-renders when those change */}
@@ -2121,7 +2121,7 @@ function ChatViewInner({
       {/* Only show if the pending question belongs to THIS sub-chat */}
       {pendingQuestions && pendingQuestions.subChatId === subChatId && (
         <div className="px-4 relative z-20">
-          <div className="w-full px-2 max-w-2xl mx-auto">
+          <div className="w-full px-2 max-w-3xl mx-auto">
             <AgentUserQuestion
               pendingQuestions={pendingQuestions}
               onAnswer={handleQuestionsAnswer}
@@ -2135,7 +2135,7 @@ function ChatViewInner({
       {(isStreaming || changedFilesForSubChat.length > 0) &&
         !(pendingQuestions?.subChatId === subChatId) && (
           <div className="px-2 -mb-6 relative z-0">
-            <div className="w-full max-w-2xl mx-auto px-2">
+            <div className="w-full max-w-3xl mx-auto px-2">
               <SubChatStatusCard
                 chatId={parentChatId}
                 isStreaming={isStreaming}
@@ -3668,7 +3668,7 @@ export function ChatView({
 
               {/* Disabled input while loading */}
               <div className="px-2 pb-2">
-                <div className="w-full max-w-2xl mx-auto">
+                <div className="w-full max-w-3xl mx-auto">
                   <div className="relative w-full">
                     <PromptInput
                       className="border bg-input-background relative z-10 p-2 rounded-xl opacity-50 pointer-events-none"
