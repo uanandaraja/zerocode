@@ -959,9 +959,11 @@ export function NewChatForm({
           {/* Title - only show when project is selected */}
           {validatedProject && (
             <div className="text-center">
-              <h1 className="text-2xl md:text-4xl font-medium tracking-tight">
-                What do you want to get done?
-              </h1>
+              <pre className="font-mono text-[0.35rem] md:text-[0.5rem] leading-[1.1] tracking-tighter text-foreground select-none whitespace-pre">{`▄▄▄▄▄▄▄▄▄  ▄▄▄▄▄▄▄ ▄▄▄▄▄▄▄     ▄▄▄▄▄    ▄▄▄▄▄▄▄   ▄▄▄▄▄   ▄▄▄▄▄▄    ▄▄▄▄▄▄▄ 
+▀▀▀▀▀████ ███▀▀▀▀▀ ███▀▀███▄ ▄███████▄ ███▀▀▀▀▀ ▄███████▄ ███▀▀██▄ ███▀▀▀▀▀ 
+   ▄███▀  ███▄▄    ███▄▄███▀ ███   ███ ███      ███   ███ ███  ███ ███▄▄    
+ ▄███▀    ███      ███▀▀██▄  ███▄▄▄███ ███      ███▄▄▄███ ███  ███ ███      
+█████████ ▀███████ ███  ▀███  ▀█████▀  ▀███████  ▀█████▀  ██████▀  ▀███████`}</pre>
             </div>
           )}
 
