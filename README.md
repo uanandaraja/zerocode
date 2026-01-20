@@ -1,8 +1,8 @@
 # ZeroCode
 
-A fork of [1Code](https://github.com/21st-dev/1code) by [21st.dev](https://21st.dev).
+A GUI wrapper for [OpenCode](https://opencode.ai).
 
-Best UI for Claude Code with local and remote agent execution.
+Forked from [1Code](https://github.com/21st-dev/1code) by [21st.dev](https://21st.dev).
 
 > **Note:** Currently tested on macOS and Linux. Windows support is experimental and may have issues.
 
