@@ -40,6 +40,7 @@ export const opencodeRouter = router({
         const abortController = new AbortController()
         let eventUnsubscribe: (() => void) | null = null
         let currentSessionId: string | null = input.sessionId || null
+        let hasPendingQuestion = false // Track if we're waiting for a question answer
 
         // Store for cancellation
         activeSessions.set(input.subChatId, {
@@ -92,11 +93,29 @@ export const opencodeRouter = router({
                     }
                   }
 
-                  // Check for completion - session.idle means we're done
+                  // Track if we have a pending question
+                  if (e.type === "question.asked") {
+                    hasPendingQuestion = true
+                    console.log("[OpenCode] question.asked - setting hasPendingQuestion=true")
+                  }
+                  if (e.type === "question.replied" || e.type === "question.rejected") {
+                    hasPendingQuestion = false
+                    console.log("[OpenCode] question answered/rejected - setting hasPendingQuestion=false")
+                  }
+
+                  // Check for completion - session.idle means the AI has stopped
+                  // BUT we should NOT complete if there's a pending question - the session
+                  // goes idle while waiting for user input, but we need to keep listening
+                  // for events after the user answers
                   if (e.type === "session.idle") {
-                    activeSessions.delete(input.subChatId)
-                    eventUnsubscribe?.()
-                    emit.complete()
+                    if (hasPendingQuestion) {
+                      console.log("[OpenCode] session.idle received but question pending - keeping stream alive")
+                    } else {
+                      console.log("[OpenCode] session.idle received, no pending question - completing stream")
+                      activeSessions.delete(input.subChatId)
+                      eventUnsubscribe?.()
+                      emit.complete()
+                    }
                   }
                 },
                 (error) => {
@@ -349,45 +368,72 @@ export const opencodeRouter = router({
         approved: z.boolean(),
         message: z.string().optional(),
         updatedInput: z.unknown().optional(),
+        subChatId: z.string().optional(), // Used to look up cwd from activeSessions
       })
     )
     .mutation(async ({ input }) => {
+      // Log FIRST thing - before any other code
+      console.log("=== [OpenCode] respondToolApproval ENTRY ===")
+      console.log("=== input:", JSON.stringify(input, null, 2))
+      
       const client = serverManager.getClient()
       if (!client) {
+        console.log("=== [OpenCode] NO CLIENT ===")
         throw new Error("OpenCode server not running")
       }
+      console.log("=== [OpenCode] client exists ===")
 
       // Check if this is a question response (updatedInput has answers)
-      const questionAnswers = input.updatedInput as { answers?: Record<string, string> } | undefined
-      if (input.approved && questionAnswers?.answers) {
+      // answers is now Record<string, string[]> - arrays of selected labels per question
+      const questionData = input.updatedInput as { 
+        questions?: Array<{ question: string }>
+        answers?: Record<string, string[]> 
+      } | undefined
+      console.log("=== [OpenCode] questionData:", JSON.stringify(questionData, null, 2))
+      console.log("=== [OpenCode] hasAnswers:", !!questionData?.answers)
+      
+      if (input.approved && questionData?.answers && questionData?.questions) {
+        console.log("=== [OpenCode] ENTERING question.reply branch ===")
         // This is a question response - use question API
-        // Convert { question: answer } format to array of selected labels
-        const answers = Object.values(questionAnswers.answers).map(answer => {
-          // Each answer is a comma-separated list of selected labels
-          return answer.split(", ").filter(Boolean)
+        // Iterate over questions array to preserve order (Object.values doesn't guarantee order)
+        const answers = questionData.questions.map(q => {
+          // Get the array of selected labels for this question
+          return questionData.answers![q.question] || []
         })
         
+        // Get directory from active session (required by OpenCode API)
+        const session = input.subChatId ? activeSessions.get(input.subChatId) : null
+        const directory = session?.cwd
+        console.log("[OpenCode] Calling question.reply with:", { requestID: input.toolUseId, answers, directory })
         try {
-          await client.question.reply({
+          const result = await client.question.reply({
             requestID: input.toolUseId,
             answers,
+            directory,
           })
+          console.log("[OpenCode] question.reply result:", result)
         } catch (e) {
           // Question may have already been answered or timed out
-          console.warn("[OpenCode] Failed to reply to question:", e)
+          console.error("[OpenCode] Failed to reply to question:", e)
         }
         return { ok: true }
       }
 
       // Question was rejected/skipped
       if (!input.approved) {
+        // Get directory from active session (required by OpenCode API)
+        const session = input.subChatId ? activeSessions.get(input.subChatId) : null
+        const directory = session?.cwd
+        console.log("[OpenCode] Calling question.reject with:", { requestID: input.toolUseId, directory })
         try {
-          await client.question.reject({
+          const result = await client.question.reject({
             requestID: input.toolUseId,
+            directory,
           })
+          console.log("[OpenCode] question.reject result:", result)
         } catch (e) {
           // Question may have already been answered or timed out
-          console.warn("[OpenCode] Failed to reject question:", e)
+          console.error("[OpenCode] Failed to reject question:", e)
         }
         return { ok: true }
       }

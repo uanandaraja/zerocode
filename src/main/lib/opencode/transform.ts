@@ -38,6 +38,9 @@ export function createOpenCodeTransformer() {
   const genId = () => `oc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
   return function* transform(event: OpenCodeEvent): Generator<UIMessageChunk> {
+    // Log ALL events for debugging
+    console.log("=== [Transform] SSE event received:", event.type)
+    
     // Emit start once
     if (!started) {
       started = true
@@ -138,9 +141,12 @@ export function createOpenCodeTransformer() {
       case "question.asked": {
         // Question tool is asking the user for input
         const questionRequest = event.properties
+        console.log("[Transform] question.asked event:", JSON.stringify(questionRequest, null, 2))
+        console.log("[Transform] questionRequest.id:", questionRequest.id)
+        console.log("[Transform] questionRequest.tool:", questionRequest.tool)
         yield {
           type: "ask-user-question",
-          toolUseId: questionRequest.id, // Use requestID as toolUseId
+          toolUseId: questionRequest.id, // Use requestID as toolUseId (should be que_xxx format)
           questions: questionRequest.questions.map(q => ({
             question: q.question,
             header: q.header,
@@ -290,23 +296,9 @@ function* transformPart(
               ? transformQuestionInput(toolPart.state.input)
               : toolPart.state.input,
           }
-          
-          // For question tool, also emit ask-user-question to trigger interactive UI
-          if (toolPart.tool === "question" && toolPart.state.input) {
-            const questionInput = toolPart.state.input as { questions?: Array<{ question: string; header: string; options: Array<{ label: string; description: string }>; multiple?: boolean }> }
-            if (questionInput.questions && Array.isArray(questionInput.questions)) {
-              yield {
-                type: "ask-user-question",
-                toolUseId: toolCallId,
-                questions: questionInput.questions.map(q => ({
-                  question: q.question,
-                  header: q.header,
-                  options: q.options || [],
-                  multiSelect: q.multiple ?? false, // SDK uses "multiple", renderer uses "multiSelect"
-                })),
-              }
-            }
-          }
+          // Note: We do NOT emit ask-user-question here for question tool.
+          // The question.asked SSE event handles that with the correct question request ID (que_xxx).
+          // Emitting here would overwrite with the wrong toolCallId (toolu_xxx).
           break
 
         case "completed":

@@ -1372,7 +1372,7 @@ function ChatViewInner({
 
   // Handle answering questions
   const handleQuestionsAnswer = useCallback(
-    async (answers: Record<string, string>) => {
+    async (answers: Record<string, string[]>) => {
       console.log("[ActiveChat] handleQuestionsAnswer called:", { answers, pendingQuestions })
       if (!pendingQuestions) {
         console.log("[ActiveChat] No pending questions, returning early")
@@ -1380,12 +1380,14 @@ function ChatViewInner({
       }
       console.log("[ActiveChat] Calling respondToolApproval with:", {
         toolUseId: pendingQuestions.toolUseId,
+        subChatId: pendingQuestions.subChatId,
         approved: true,
         answers,
       })
       try {
         const result = await trpcClient.claude.respondToolApproval.mutate({
           toolUseId: pendingQuestions.toolUseId,
+          subChatId: pendingQuestions.subChatId,
           approved: true,
           updatedInput: { questions: pendingQuestions.questions, answers },
         })
@@ -1401,7 +1403,7 @@ function ChatViewInner({
   // Handle skipping questions
   const handleQuestionsSkip = useCallback(async () => {
     if (!pendingQuestions) return
-    const toolUseId = pendingQuestions.toolUseId
+    const { toolUseId, subChatId: questionSubChatId } = pendingQuestions
 
     // Clear UI immediately - don't wait for backend
     // This ensures dialog closes even if stream was already aborted
@@ -1411,6 +1413,7 @@ function ChatViewInner({
     try {
       await trpcClient.claude.respondToolApproval.mutate({
         toolUseId,
+        subChatId: questionSubChatId,
         approved: false,
         message: QUESTIONS_SKIPPED_MESSAGE,
       })

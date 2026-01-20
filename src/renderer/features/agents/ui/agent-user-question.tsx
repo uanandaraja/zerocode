@@ -8,7 +8,7 @@ import type { PendingUserQuestions } from "../atoms"
 
 interface AgentUserQuestionProps {
   pendingQuestions: PendingUserQuestions
-  onAnswer: (answers: Record<string, string>) => void
+  onAnswer: (answers: Record<string, string[]>) => void
   onSkip: () => void
 }
 
@@ -131,12 +131,12 @@ export const AgentUserQuestion = memo(function AgentUserQuestion({
       )
       if (allAnswered) {
         setIsSubmitting(true)
-        // Convert answers to SDK format: { questionText: label } or { questionText: "label1, label2" } for multiSelect
-        const formattedAnswers: Record<string, string> = {}
+        // Pass answers directly as arrays (no comma-joining to avoid splitting issues with labels containing commas)
+        const formattedAnswers: Record<string, string[]> = {}
         for (const question of questions) {
-          const selected = answers[question.question] || []
-          formattedAnswers[question.question] = selected.join(", ")
+          formattedAnswers[question.question] = answers[question.question] || []
         }
+        console.log("[AgentUserQuestion] Calling onAnswer with:", formattedAnswers)
         onAnswer(formattedAnswers)
       }
     }

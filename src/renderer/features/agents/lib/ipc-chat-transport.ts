@@ -156,6 +156,10 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
             onData: (chunk: UIMessageChunk) => {
               // Handle AskUserQuestion - show question UI
               if (chunk.type === "ask-user-question") {
+                console.log("[Transport] ask-user-question chunk received:", {
+                  toolUseId: chunk.toolUseId,
+                  questionsCount: chunk.questions?.length,
+                })
                 appStore.set(pendingUserQuestionsAtom, {
                   subChatId: this.config.subChatId,
                   toolUseId: chunk.toolUseId,
