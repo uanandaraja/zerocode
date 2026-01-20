@@ -31,7 +31,17 @@ function registerIpcHandlers(getWindow: () => BrowserWindow | null): void {
     "app:show-notification",
     (_event, options: { title: string; body: string }) => {
       const { Notification } = require("electron")
-      new Notification(options).show()
+      if (!Notification.isSupported()) {
+        return { success: false, reason: "not-supported" }
+      }
+      try {
+        const notification = new Notification(options)
+        notification.show()
+        return { success: true }
+      } catch (error) {
+        console.error("Failed to show notification:", error)
+        return { success: false, reason: "error" }
+      }
     },
   )
 

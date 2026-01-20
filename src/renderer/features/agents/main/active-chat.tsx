@@ -2966,10 +2966,13 @@ export function ChatView({
                   // Ignore audio errors
                 }
               }
-
-              // Show native notification (desktop app, when window not focused)
-              notifyAgentComplete(agentChat?.name || "Agent")
             }
+          }
+
+          // Show native notification when window is not focused (even if viewing same chat)
+          // The hook internally checks focus state
+          if (!wasManuallyAborted) {
+            notifyAgentComplete(agentChat?.name || "Agent")
           }
 
           // Refresh diff stats after agent finishes making changes
@@ -3090,10 +3093,13 @@ export function ChatView({
                   // Ignore audio errors
                 }
               }
-
-              // Show native notification (desktop app, when window not focused)
-              notifyAgentComplete(agentChat?.name || "Agent")
             }
+          }
+
+          // Show native notification when window is not focused (even if viewing same chat)
+          // The hook internally checks focus state
+          if (!wasManuallyAborted) {
+            notifyAgentComplete(agentChat?.name || "Agent")
           }
 
           // Refresh diff stats after agent finishes making changes

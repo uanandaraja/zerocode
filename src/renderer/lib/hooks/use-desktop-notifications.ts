@@ -11,8 +11,9 @@ const pendingNotificationsAtom = atomWithStorage<number>(
   0,
 )
 
-// Track window focus state
-let isWindowFocused = true
+// Track window focus state - initialize from document.hasFocus() if available
+let isWindowFocused =
+  typeof document !== "undefined" ? document.hasFocus() : true
 
 /**
  * Hook to manage desktop notifications and badge count
@@ -28,7 +29,7 @@ export function useDesktopNotifications() {
   useEffect(() => {
     if (!isDesktopApp() || typeof window === "undefined") return
 
-    // Initialize focus state
+    // Initialize focus state from document
     isWindowFocused = document.hasFocus()
 
     const handleFocus = () => {
@@ -42,11 +43,21 @@ export function useDesktopNotifications() {
       isWindowFocused = false
     }
 
-    // Use both window events and Electron API
+    // Use both window events and Electron API for redundancy
     window.addEventListener("focus", handleFocus)
     window.addEventListener("blur", handleBlur)
 
-    // Also subscribe to Electron focus events
+    // Also use visibility change as a fallback (catches tab switches, etc.)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && document.hasFocus()) {
+        handleFocus()
+      } else if (document.visibilityState === "hidden") {
+        handleBlur()
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    // Subscribe to Electron focus events (most reliable for Electron)
     const unsubscribe = window.desktopApi?.onFocusChange?.((focused) => {
       if (focused) {
         handleFocus()
@@ -60,6 +71,7 @@ export function useDesktopNotifications() {
     return () => {
       window.removeEventListener("focus", handleFocus)
       window.removeEventListener("blur", handleBlur)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
       unsubscribe?.()
     }
   }, [setPendingCount])
