@@ -110,6 +110,7 @@ import {
   setLoading,
   subChatFilesAtom,
   undoStackAtom,
+  zenModeAtom,
   type ScrollPositionData,
   type UndoItem,
 } from "../atoms"
@@ -1372,12 +1373,26 @@ function ChatViewInner({
   // Handle answering questions
   const handleQuestionsAnswer = useCallback(
     async (answers: Record<string, string>) => {
-      if (!pendingQuestions) return
-      await trpcClient.claude.respondToolApproval.mutate({
+      console.log("[ActiveChat] handleQuestionsAnswer called:", { answers, pendingQuestions })
+      if (!pendingQuestions) {
+        console.log("[ActiveChat] No pending questions, returning early")
+        return
+      }
+      console.log("[ActiveChat] Calling respondToolApproval with:", {
         toolUseId: pendingQuestions.toolUseId,
         approved: true,
-        updatedInput: { questions: pendingQuestions.questions, answers },
+        answers,
       })
+      try {
+        const result = await trpcClient.claude.respondToolApproval.mutate({
+          toolUseId: pendingQuestions.toolUseId,
+          approved: true,
+          updatedInput: { questions: pendingQuestions.questions, answers },
+        })
+        console.log("[ActiveChat] respondToolApproval result:", result)
+      } catch (e) {
+        console.error("[ActiveChat] respondToolApproval error:", e)
+      }
       setPendingQuestions(null)
     },
     [pendingQuestions, setPendingQuestions],
@@ -2320,6 +2335,14 @@ export function ChatView({
       return prev
     })
   }, [chatId, setUnseenChanges])
+
+  // Zen mode: close diff sidebar when entering zen mode
+  const isZenMode = useAtomValue(zenModeAtom)
+  useEffect(() => {
+    if (isZenMode && isDiffSidebarOpen) {
+      setIsDiffSidebarOpen(false)
+    }
+  }, [isZenMode, isDiffSidebarOpen, setIsDiffSidebarOpen])
 
   // Get sub-chat state from store
   const activeSubChatId = useAgentSubChatStore((state) => state.activeSubChatId)

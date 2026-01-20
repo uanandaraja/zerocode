@@ -22,6 +22,7 @@ export interface AgentActionContext {
   setSettingsDialogOpen?: (open: boolean) => void
   setSettingsActiveTab?: (tab: SettingsTab) => void
   setShortcutsDialogOpen?: (open: boolean) => void
+  toggleZenMode?: () => void
 
   // Data
   selectedChatId?: string | null
@@ -102,6 +103,18 @@ const toggleSidebarAction: AgentActionDefinition = {
   },
 }
 
+const toggleZenModeAction: AgentActionDefinition = {
+  id: "toggle-zen-mode",
+  label: "Toggle zen mode",
+  description: "Hide all sidebars for distraction-free focus",
+  category: "view",
+  hotkey: ["cmd+shift+z", "ctrl+shift+z"],
+  handler: async (context) => {
+    context.toggleZenMode?.()
+    return { success: true }
+  },
+}
+
 // ============================================================================
 // ACTION REGISTRY
 // ============================================================================
@@ -111,6 +124,7 @@ export const AGENT_ACTIONS: Record<string, AgentActionDefinition> = {
   "create-new-agent": createNewAgentAction,
   "open-settings": openSettingsAction,
   "toggle-sidebar": toggleSidebarAction,
+  "toggle-zen-mode": toggleZenModeAction,
 }
 
 export function getAgentAction(id: string): AgentActionDefinition | undefined {

@@ -12,7 +12,11 @@ import {
   isDesktopAtom,
   isFullscreenAtom,
 } from "../../lib/atoms"
-import { selectedAgentChatIdAtom, selectedProjectAtom } from "../agents/atoms"
+import {
+  selectedAgentChatIdAtom,
+  selectedProjectAtom,
+  zenModeAtom,
+} from "../agents/atoms"
 import { trpc } from "../../lib/trpc"
 import { useAgentsHotkeys } from "../agents/lib/agents-hotkeys-manager"
 import { AgentsSettingsDialog } from "../../components/dialogs/agents-settings-dialog"
@@ -89,6 +93,7 @@ export function AgentsLayout() {
   )
   const [selectedChatId, setSelectedChatId] = useAtom(selectedAgentChatIdAtom)
   const [selectedProject, setSelectedProject] = useAtom(selectedProjectAtom)
+  const [isZenMode, setIsZenMode] = useAtom(zenModeAtom)
 
   // Fetch projects to validate selectedProject exists
   const { data: projects, isLoading: isLoadingProjects } =
@@ -171,6 +176,20 @@ export function AgentsLayout() {
     }
   }, [selectedChatId, setChatId])
 
+  // Toggle zen mode: collapse all sidebars for distraction-free focus
+  // On exit, open main sidebar only (simple, predictable behavior)
+  const toggleZenMode = useCallback(() => {
+    if (isZenMode) {
+      // Exit zen mode - open main sidebar only
+      setSidebarOpen(true)
+      setIsZenMode(false)
+    } else {
+      // Enter zen mode - close all sidebars
+      setSidebarOpen(false)
+      setIsZenMode(true)
+    }
+  }, [isZenMode, setSidebarOpen, setIsZenMode])
+
   // Initialize hotkeys manager
   useAgentsHotkeys({
     setSelectedChatId,
@@ -178,6 +197,7 @@ export function AgentsLayout() {
     setSettingsDialogOpen: setSettingsOpen,
     setSettingsActiveTab,
     setShortcutsDialogOpen: setShortcutsOpen,
+    toggleZenMode,
     selectedChatId,
   })
 

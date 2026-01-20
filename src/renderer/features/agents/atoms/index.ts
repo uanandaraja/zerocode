@@ -515,3 +515,7 @@ export type UndoItem =
   | { type: "subchat"; subChatId: string; chatId: string; timeoutId: ReturnType<typeof setTimeout> }
 
 export const undoStackAtom = atom<UndoItem[]>([])
+
+// Zen mode state (NOT persisted - resets on restart)
+// When enabled, all sidebars are collapsed for distraction-free focus
+export const zenModeAtom = atom<boolean>(false)

@@ -64,6 +64,7 @@ export interface AgentsHotkeysManagerConfig {
   setSettingsDialogOpen?: (open: boolean) => void
   setSettingsActiveTab?: (tab: SettingsTab) => void
   setShortcutsDialogOpen?: (open: boolean) => void
+  toggleZenMode?: () => void
   selectedChatId?: string | null
 }
 
@@ -92,6 +93,7 @@ export function useAgentsHotkeys(
       setSettingsDialogOpen: config.setSettingsDialogOpen,
       setSettingsActiveTab: config.setSettingsActiveTab,
       setShortcutsDialogOpen: config.setShortcutsDialogOpen,
+      toggleZenMode: config.toggleZenMode,
       selectedChatId: config.selectedChatId,
     }),
     [
@@ -100,6 +102,7 @@ export function useAgentsHotkeys(
       config.setSettingsDialogOpen,
       config.setSettingsActiveTab,
       config.setShortcutsDialogOpen,
+      config.toggleZenMode,
       config.selectedChatId,
     ],
   )
@@ -200,6 +203,27 @@ export function useAgentsHotkeys(
     return () => window.removeEventListener("keydown", handleSettings, true)
   }, [enabled, handleHotkeyAction])
 
+  // Direct listener for Cmd+Shift+Z - toggle zen mode
+  React.useEffect(() => {
+    if (!enabled) return
+
+    const handleZenMode = (e: KeyboardEvent) => {
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.shiftKey &&
+        e.code === "KeyZ" &&
+        !e.altKey
+      ) {
+        e.preventDefault()
+        e.stopPropagation()
+        handleHotkeyAction("toggle-zen-mode")
+      }
+    }
+
+    window.addEventListener("keydown", handleZenMode, true)
+    return () => window.removeEventListener("keydown", handleZenMode, true)
+  }, [enabled, handleHotkeyAction])
+
   // General hotkey handler for remaining actions
   const actionsWithHotkeys = useMemo(
     () =>
@@ -209,7 +233,8 @@ export function useAgentsHotkeys(
           action.id !== "create-new-agent" &&
           action.id !== "toggle-sidebar" &&
           action.id !== "open-shortcuts" &&
-          action.id !== "open-settings",
+          action.id !== "open-settings" &&
+          action.id !== "toggle-zen-mode",
       ),
     [],
   )

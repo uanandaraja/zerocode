@@ -25,6 +25,7 @@ export {
   agentsSidebarWidthAtom,
   agentsSubChatsSidebarModeAtom,
   agentsSubChatsSidebarWidthAtom,
+  zenModeAtom,
 
   // Preview atoms
   previewPathAtomFamily,

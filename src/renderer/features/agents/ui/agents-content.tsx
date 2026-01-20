@@ -17,6 +17,7 @@ import {
   agentsSidebarOpenAtom,
   agentsSubChatsSidebarModeAtom,
   agentsSubChatsSidebarWidthAtom,
+  zenModeAtom,
 } from "../atoms"
 import {
   selectedTeamIdAtom,
@@ -68,6 +69,7 @@ export function AgentsContent() {
     agentsSubChatsSidebarModeAtom,
   )
   const setTerminalSidebarOpen = useSetAtom(terminalSidebarOpenAtom)
+  const isZenMode = useAtomValue(zenModeAtom)
 
   const hasOpenedSubChatsSidebar = useRef(false)
   const wasSubChatsSidebarOpen = useRef(false)
@@ -219,6 +221,16 @@ export function AgentsContent() {
       setPreviewSidebarOpen(false)
     }
   }, [isMobile, isHydrated, setSidebarOpen, setPreviewSidebarOpen])
+
+  // Zen mode: close sub-chats sidebar and terminal when entering zen mode
+  useEffect(() => {
+    if (isZenMode) {
+      // Close sub-chats sidebar (switch to tabs mode)
+      setSubChatsSidebarMode("tabs")
+      // Close terminal sidebar
+      setTerminalSidebarOpen(false)
+    }
+  }, [isZenMode, setSubChatsSidebarMode, setTerminalSidebarOpen])
 
   // On mobile: when chat is selected, switch to chat mode
   useEffect(() => {
