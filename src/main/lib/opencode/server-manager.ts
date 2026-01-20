@@ -1,4 +1,8 @@
 import { EventEmitter } from "events"
+import { spawn, type ChildProcess } from "child_process"
+import os from "os"
+import path from "path"
+import fs from "fs"
 import type { OpenCodeServerState } from "./types"
 
 // Type-only imports (these are erased at runtime)
@@ -9,14 +13,116 @@ const DEFAULT_PORT = 4096
 const DEFAULT_URL = `http://127.0.0.1:${DEFAULT_PORT}`
 
 // Dynamically imported SDK functions
-let createOpencodeServer: typeof import("@opencode-ai/sdk").createOpencodeServer
 let createOpencodeClient: typeof import("@opencode-ai/sdk/v2").createOpencodeClient
 
+/**
+ * Find the opencode binary by checking common install locations
+ * Returns the full path to the binary, or null if not found
+ */
+function findOpencodeBinary(): string | null {
+  // Common install locations for opencode
+  const commonPaths = [
+    path.join(os.homedir(), ".bun", "bin"),       // bun global installs
+    path.join(os.homedir(), ".local", "bin"),     // pipx/cargo style
+    "/usr/local/bin",
+    "/opt/homebrew/bin",                           // Homebrew on Apple Silicon
+    "/usr/bin",
+  ]
+  
+  for (const dir of commonPaths) {
+    const binPath = path.join(dir, "opencode")
+    if (fs.existsSync(binPath)) {
+      console.log("[OpenCode] Found binary at:", binPath)
+      return binPath
+    }
+  }
+  
+  console.warn("[OpenCode] opencode binary not found - please install it: bun install -g opencode-ai")
+  return null
+}
+
+/**
+ * Spawn the opencode server directly using the full binary path
+ * This avoids PATH resolution issues in Electron apps launched from Finder/Dock
+ */
+function spawnOpencodeServer(options: {
+  hostname?: string
+  port?: number
+  timeout?: number
+}): Promise<{ url: string; process: ChildProcess; close: () => void }> {
+  const { hostname = "127.0.0.1", port = DEFAULT_PORT, timeout = 30000 } = options
+  
+  const binaryPath = findOpencodeBinary()
+  if (!binaryPath) {
+    return Promise.reject(new Error("opencode binary not found. Please install it: bun install -g opencode-ai"))
+  }
+  
+  const args = ["serve", `--hostname=${hostname}`, `--port=${port}`]
+  
+  console.log("[OpenCode] Spawning server:", binaryPath, args.join(" "))
+  
+  const proc = spawn(binaryPath, args, {
+    env: process.env,
+    stdio: ["ignore", "pipe", "pipe"],
+  })
+  
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      proc.kill()
+      reject(new Error(`Timeout waiting for server to start after ${timeout}ms`))
+    }, timeout)
+    
+    let output = ""
+    
+    proc.stdout?.on("data", (chunk) => {
+      output += chunk.toString()
+      const lines = output.split("\n")
+      for (const line of lines) {
+        if (line.includes("opencode server listening")) {
+          const match = line.match(/on\s+(https?:\/\/[^\s]+)/)
+          if (match) {
+            clearTimeout(timeoutId)
+            console.log("[OpenCode] Server started at:", match[1])
+            resolve({
+              url: match[1],
+              process: proc,
+              close: () => proc.kill(),
+            })
+            return
+          }
+        }
+      }
+    })
+    
+    proc.stderr?.on("data", (chunk) => {
+      const text = chunk.toString()
+      output += text
+      // Also log stderr for debugging (warnings, etc)
+      if (text.trim()) {
+        console.log("[OpenCode] Server stderr:", text.trim())
+      }
+    })
+    
+    proc.on("error", (error) => {
+      clearTimeout(timeoutId)
+      reject(new Error(`Failed to spawn opencode: ${error.message}`))
+    })
+    
+    proc.on("exit", (code) => {
+      clearTimeout(timeoutId)
+      if (code !== 0) {
+        let msg = `Server exited with code ${code}`
+        if (output.trim()) {
+          msg += `\nOutput: ${output}`
+        }
+        reject(new Error(msg))
+      }
+    })
+  })
+}
+
 async function loadSdk() {
-  if (!createOpencodeServer || !createOpencodeClient) {
-    // Server creation from main SDK
-    const sdk = await import("@opencode-ai/sdk")
-    createOpencodeServer = sdk.createOpencodeServer
+  if (!createOpencodeClient) {
     // Client from v2 SDK (has question API)
     const sdkV2 = await import("@opencode-ai/sdk/v2")
     createOpencodeClient = sdkV2.createOpencodeClient
@@ -101,9 +207,10 @@ class OpenCodeServerManager extends EventEmitter {
           directory,
         })
       } else {
-        // Start a new server
+        // Start a new server using our own spawn function
+        // This uses the full binary path to avoid PATH resolution issues in Electron
         this.usingExternalServer = false
-        this.server = await createOpencodeServer({
+        this.server = await spawnOpencodeServer({
           hostname: "127.0.0.1",
           port: DEFAULT_PORT,
           timeout: 30000, // 30 seconds timeout
