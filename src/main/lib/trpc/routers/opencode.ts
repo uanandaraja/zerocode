@@ -4,7 +4,7 @@ import { router, publicProcedure } from "../index"
 import { serverManager, createOpenCodeTransformer, transformSessionMessages, type OpenCodeEvent, type UIMessageChunk } from "../../opencode"
 
 // Track active sessions for cancellation
-const activeSessions = new Map<string, { abort: () => void; sessionId: string | null }>()
+const activeSessions = new Map<string, { abort: () => void; sessionId: string | null; cwd: string }>()
 
 export const opencodeRouter = router({
   /**
@@ -45,6 +45,7 @@ export const opencodeRouter = router({
         activeSessions.set(input.subChatId, {
           abort: () => abortController.abort(),
           sessionId: currentSessionId,
+          cwd: input.cwd,
         })
 
         const run = async () => {
@@ -95,6 +96,7 @@ export const opencodeRouter = router({
                   if (e.type === "session.idle") {
                     activeSessions.delete(input.subChatId)
                     eventUnsubscribe?.()
+                    emit.complete()
                   }
                 },
                 (error) => {
@@ -112,8 +114,7 @@ export const opencodeRouter = router({
             let sessionId = input.sessionId
             if (!sessionId) {
               const result = await client.session.create({
-                query: { directory: input.cwd },
-                body: {},
+                directory: input.cwd,
               })
               sessionId = result.data?.id
               currentSessionId = sessionId || null
@@ -131,6 +132,7 @@ export const opencodeRouter = router({
                 activeSessions.set(input.subChatId, {
                   abort: () => abortController.abort(),
                   sessionId,
+                  cwd: input.cwd,
                 })
               }
             }
@@ -162,15 +164,13 @@ export const opencodeRouter = router({
 
             // Send prompt (async - response comes via SSE)
             await client.session.promptAsync({
-              query: { directory: input.cwd },
-              path: { id: sessionId },
-              body: {
-                parts,
-                agent,
-                model: input.provider && input.model
-                  ? { providerID: input.provider, modelID: input.model }
-                  : undefined,
-              },
+              sessionID: sessionId,
+              directory: input.cwd,
+              parts,
+              agent,
+              model: input.provider && input.model
+                ? { providerID: input.provider, modelID: input.model }
+                : undefined,
             })
           } catch (error) {
             console.error("[OpenCode] Error:", error)
@@ -212,7 +212,7 @@ export const opencodeRouter = router({
         const client = serverManager.getClient()
         if (client && session.sessionId) {
           try {
-            await client.session.abort({ path: { id: session.sessionId } })
+            await client.session.abort({ sessionID: session.sessionId, directory: session.cwd })
           } catch {
             // Ignore abort errors
           }
@@ -250,9 +250,10 @@ export const opencodeRouter = router({
         throw new Error("OpenCode server not running")
       }
 
-      await client.postSessionIdPermissionsPermissionId({
-        path: { id: input.sessionId, permissionID: input.permissionId },
-        body: { response: input.response },
+      // Use the new v2 permission.reply API
+      await client.permission.reply({
+        requestID: input.permissionId,
+        reply: input.response,
       })
 
       return { ok: true }
@@ -368,8 +369,8 @@ export const opencodeRouter = router({
         
         try {
           await client.question.reply({
-            path: { requestID: input.toolUseId },
-            body: { answers },
+            requestID: input.toolUseId,
+            answers,
           })
         } catch (e) {
           // Question may have already been answered or timed out
@@ -382,7 +383,7 @@ export const opencodeRouter = router({
       if (!input.approved) {
         try {
           await client.question.reject({
-            path: { requestID: input.toolUseId },
+            requestID: input.toolUseId,
           })
         } catch (e) {
           // Question may have already been answered or timed out
@@ -413,11 +414,12 @@ export const opencodeRouter = router({
 
       try {
         const result = await client.session.messages({
-          path: { id: input.sessionId },
-          query: { directory: input.directory },
+          sessionID: input.sessionId,
+          directory: input.directory,
         })
 
-        const messages = transformSessionMessages(result.data || [])
+        // Use type assertion since v2 types are compatible at runtime
+        const messages = transformSessionMessages(result.data as Parameters<typeof transformSessionMessages>[0] || [])
         return { messages, sessionId: input.sessionId }
       } catch (error) {
         console.error("[OpenCode] Failed to load session messages:", error)

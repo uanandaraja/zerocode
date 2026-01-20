@@ -2,20 +2,24 @@ import { EventEmitter } from "events"
 import type { OpenCodeServerState } from "./types"
 
 // Type-only imports (these are erased at runtime)
-import type { OpencodeClient } from "@opencode-ai/sdk"
+// Using v2 SDK which has the question API
+import type { OpencodeClient } from "@opencode-ai/sdk/v2"
 
 const DEFAULT_PORT = 4096
 const DEFAULT_URL = `http://127.0.0.1:${DEFAULT_PORT}`
 
 // Dynamically imported SDK functions
 let createOpencodeServer: typeof import("@opencode-ai/sdk").createOpencodeServer
-let createOpencodeClient: typeof import("@opencode-ai/sdk").createOpencodeClient
+let createOpencodeClient: typeof import("@opencode-ai/sdk/v2").createOpencodeClient
 
 async function loadSdk() {
   if (!createOpencodeServer || !createOpencodeClient) {
+    // Server creation from main SDK
     const sdk = await import("@opencode-ai/sdk")
     createOpencodeServer = sdk.createOpencodeServer
-    createOpencodeClient = sdk.createOpencodeClient
+    // Client from v2 SDK (has question API)
+    const sdkV2 = await import("@opencode-ai/sdk/v2")
+    createOpencodeClient = sdkV2.createOpencodeClient
   }
 }
 
