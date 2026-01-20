@@ -142,3 +142,18 @@ export function showAgentNotification(agentName: string) {
     })
   }
 }
+
+/**
+ * Standalone function to show notification when agent asks a question
+ */
+export function showAgentQuestionNotification(questionHeader?: string) {
+  if (!isDesktopApp() || typeof window === "undefined") return
+
+  // Only notify if window is not focused
+  if (!document.hasFocus()) {
+    window.desktopApi?.showNotification({
+      title: "Agent needs input",
+      body: questionHeader || "Waiting for your response",
+    })
+  }
+}

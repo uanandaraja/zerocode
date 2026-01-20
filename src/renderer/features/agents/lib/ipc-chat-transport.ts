@@ -6,6 +6,7 @@ import {
   sessionInfoAtom,
 } from "../../../lib/atoms"
 import { appStore } from "../../../lib/jotai-store"
+import { showAgentQuestionNotification } from "../../../lib/hooks/use-desktop-notifications"
 import { trpcClient } from "../../../lib/trpc"
 import {
   askUserQuestionResultsAtom,
@@ -161,6 +162,8 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
                   toolUseId: chunk.toolUseId,
                   questions: chunk.questions,
                 })
+                // Show notification if window not focused
+                showAgentQuestionNotification(chunk.questions?.[0]?.header)
               }
 
               // Handle AskUserQuestion timeout - clear pending question immediately
