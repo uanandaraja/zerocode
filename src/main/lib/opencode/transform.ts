@@ -38,9 +38,6 @@ export function createOpenCodeTransformer() {
   const genId = () => `oc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
   return function* transform(event: OpenCodeEvent): Generator<UIMessageChunk> {
-    // Log ALL events for debugging
-    console.log("=== [Transform] SSE event received:", event.type)
-    
     // Emit start once
     if (!started) {
       started = true
@@ -141,17 +138,14 @@ export function createOpenCodeTransformer() {
       case "question.asked": {
         // Question tool is asking the user for input
         const questionRequest = event.properties
-        console.log("[Transform] question.asked event:", JSON.stringify(questionRequest, null, 2))
-        console.log("[Transform] questionRequest.id:", questionRequest.id)
-        console.log("[Transform] questionRequest.tool:", questionRequest.tool)
         yield {
           type: "ask-user-question",
-          toolUseId: questionRequest.id, // Use requestID as toolUseId (should be que_xxx format)
+          toolUseId: questionRequest.id, // Use question request ID (que_xxx format)
           questions: questionRequest.questions.map(q => ({
             question: q.question,
             header: q.header,
             options: q.options || [],
-            multiSelect: q.multiple ?? false, // SDK uses "multiple", renderer uses "multiSelect"
+            multiSelect: q.multiple ?? false,
           })),
         }
         break

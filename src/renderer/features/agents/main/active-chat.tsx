@@ -1373,27 +1373,16 @@ function ChatViewInner({
   // Handle answering questions
   const handleQuestionsAnswer = useCallback(
     async (answers: Record<string, string[]>) => {
-      console.log("[ActiveChat] handleQuestionsAnswer called:", { answers, pendingQuestions })
-      if (!pendingQuestions) {
-        console.log("[ActiveChat] No pending questions, returning early")
-        return
-      }
-      console.log("[ActiveChat] Calling respondToolApproval with:", {
-        toolUseId: pendingQuestions.toolUseId,
-        subChatId: pendingQuestions.subChatId,
-        approved: true,
-        answers,
-      })
+      if (!pendingQuestions) return
       try {
-        const result = await trpcClient.claude.respondToolApproval.mutate({
+        await trpcClient.claude.respondToolApproval.mutate({
           toolUseId: pendingQuestions.toolUseId,
           subChatId: pendingQuestions.subChatId,
           approved: true,
           updatedInput: { questions: pendingQuestions.questions, answers },
         })
-        console.log("[ActiveChat] respondToolApproval result:", result)
-      } catch (e) {
-        console.error("[ActiveChat] respondToolApproval error:", e)
+      } catch {
+        // Question may have already been answered or timed out
       }
       setPendingQuestions(null)
     },

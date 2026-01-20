@@ -96,26 +96,19 @@ export const opencodeRouter = router({
                   // Track if we have a pending question
                   if (e.type === "question.asked") {
                     hasPendingQuestion = true
-                    console.log("[OpenCode] question.asked - setting hasPendingQuestion=true")
                   }
                   if (e.type === "question.replied" || e.type === "question.rejected") {
                     hasPendingQuestion = false
-                    console.log("[OpenCode] question answered/rejected - setting hasPendingQuestion=false")
                   }
 
                   // Check for completion - session.idle means the AI has stopped
                   // BUT we should NOT complete if there's a pending question - the session
                   // goes idle while waiting for user input, but we need to keep listening
                   // for events after the user answers
-                  if (e.type === "session.idle") {
-                    if (hasPendingQuestion) {
-                      console.log("[OpenCode] session.idle received but question pending - keeping stream alive")
-                    } else {
-                      console.log("[OpenCode] session.idle received, no pending question - completing stream")
-                      activeSessions.delete(input.subChatId)
-                      eventUnsubscribe?.()
-                      emit.complete()
-                    }
+                  if (e.type === "session.idle" && !hasPendingQuestion) {
+                    activeSessions.delete(input.subChatId)
+                    eventUnsubscribe?.()
+                    emit.complete()
                   }
                 },
                 (error) => {
@@ -372,68 +365,46 @@ export const opencodeRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      // Log FIRST thing - before any other code
-      console.log("=== [OpenCode] respondToolApproval ENTRY ===")
-      console.log("=== input:", JSON.stringify(input, null, 2))
-      
       const client = serverManager.getClient()
       if (!client) {
-        console.log("=== [OpenCode] NO CLIENT ===")
         throw new Error("OpenCode server not running")
       }
-      console.log("=== [OpenCode] client exists ===")
 
       // Check if this is a question response (updatedInput has answers)
-      // answers is now Record<string, string[]> - arrays of selected labels per question
       const questionData = input.updatedInput as { 
         questions?: Array<{ question: string }>
         answers?: Record<string, string[]> 
       } | undefined
-      console.log("=== [OpenCode] questionData:", JSON.stringify(questionData, null, 2))
-      console.log("=== [OpenCode] hasAnswers:", !!questionData?.answers)
       
       if (input.approved && questionData?.answers && questionData?.questions) {
-        console.log("=== [OpenCode] ENTERING question.reply branch ===")
         // This is a question response - use question API
-        // Iterate over questions array to preserve order (Object.values doesn't guarantee order)
-        const answers = questionData.questions.map(q => {
-          // Get the array of selected labels for this question
-          return questionData.answers![q.question] || []
-        })
+        // Iterate over questions array to preserve order
+        const answers = questionData.questions.map(q => questionData.answers![q.question] || [])
         
-        // Get directory from active session (required by OpenCode API)
+        // Get directory from active session
         const session = input.subChatId ? activeSessions.get(input.subChatId) : null
-        const directory = session?.cwd
-        console.log("[OpenCode] Calling question.reply with:", { requestID: input.toolUseId, answers, directory })
         try {
-          const result = await client.question.reply({
+          await client.question.reply({
             requestID: input.toolUseId,
             answers,
-            directory,
+            directory: session?.cwd,
           })
-          console.log("[OpenCode] question.reply result:", result)
-        } catch (e) {
+        } catch {
           // Question may have already been answered or timed out
-          console.error("[OpenCode] Failed to reply to question:", e)
         }
         return { ok: true }
       }
 
       // Question was rejected/skipped
       if (!input.approved) {
-        // Get directory from active session (required by OpenCode API)
         const session = input.subChatId ? activeSessions.get(input.subChatId) : null
-        const directory = session?.cwd
-        console.log("[OpenCode] Calling question.reject with:", { requestID: input.toolUseId, directory })
         try {
-          const result = await client.question.reject({
+          await client.question.reject({
             requestID: input.toolUseId,
-            directory,
+            directory: session?.cwd,
           })
-          console.log("[OpenCode] question.reject result:", result)
-        } catch (e) {
+        } catch {
           // Question may have already been answered or timed out
-          console.error("[OpenCode] Failed to reject question:", e)
         }
         return { ok: true }
       }

@@ -136,7 +136,6 @@ export const AgentUserQuestion = memo(function AgentUserQuestion({
         for (const question of questions) {
           formattedAnswers[question.question] = answers[question.question] || []
         }
-        console.log("[AgentUserQuestion] Calling onAnswer with:", formattedAnswers)
         onAnswer(formattedAnswers)
       }
     }
