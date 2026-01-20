@@ -315,7 +315,7 @@ export const messageTokenDataAtom = atom((get) => {
   // Get the last message to check if its tokens changed
   const lastId = ids[ids.length - 1]
   const lastMsg = lastId ? get(messageAtomFamily(lastId)) : null
-  const lastMsgOutputTokens = (lastMsg?.metadata as any)?.usage?.outputTokens || 0
+  const lastMsgOutputTokens = (lastMsg?.metadata as any)?.outputTokens || 0
 
   const cached = tokenDataCacheByChat.get(subChatId)
 
@@ -331,7 +331,9 @@ export const messageTokenDataAtom = atom((get) => {
   }
 
   // Recalculate token data
-  let inputTokens = 0
+  // NOTE: For context window, we use the LAST assistant message's input tokens
+  // because each turn's input tokens already includes the full conversation history
+  let lastInputTokens = 0
   let outputTokens = 0
   let cacheReadTokens = 0
   let cacheWriteTokens = 0
@@ -340,22 +342,25 @@ export const messageTokenDataAtom = atom((get) => {
   for (const id of ids) {
     const msg = get(messageAtomFamily(id))
     const metadata = msg?.metadata as any
-    if (metadata?.usage) {
-      inputTokens += metadata.usage.inputTokens || 0
-      outputTokens += metadata.usage.outputTokens || 0
-      cacheReadTokens += metadata.usage.cacheReadInputTokens || 0
-      cacheWriteTokens += metadata.usage.cacheCreationInputTokens || 0
-      reasoningTokens += metadata.usage.reasoningTokens || 0
+    if (metadata && msg?.role === "assistant") {
+      // Track the last assistant message's input tokens (cumulative context)
+      lastInputTokens = metadata.inputTokens || 0
+      // Sum all output tokens across messages
+      outputTokens += metadata.outputTokens || 0
+      // Track cache from last message for display
+      cacheReadTokens = metadata.cacheReadTokens || 0
+      cacheWriteTokens = metadata.cacheWriteTokens || 0
+      reasoningTokens += metadata.reasoningTokens || 0
     }
   }
 
   const newTokenData: TokenData = {
-    inputTokens,
+    inputTokens: lastInputTokens,
     outputTokens,
     cacheReadTokens,
     cacheWriteTokens,
     reasoningTokens,
-    totalTokens: inputTokens + outputTokens,
+    totalTokens: lastInputTokens + outputTokens,
     messageCount: ids.length,
     lastMsgOutputTokens,
   }

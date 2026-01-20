@@ -21,6 +21,8 @@ type ModelId = keyof typeof CONTEXT_WINDOWS
 export interface MessageTokenData {
   totalInputTokens: number
   totalOutputTokens: number
+  totalCacheReadTokens?: number
+  totalCacheWriteTokens?: number
   totalCostUsd: number
   messageCount: number
 }
@@ -105,6 +107,7 @@ export const AgentContextIndicator = memo(function AgentContextIndicator({
   const contextWindow = CONTEXT_WINDOWS[modelId]
   const percentUsed = Math.min(100, (totalTokens / contextWindow) * 100)
   const isEmpty = totalTokens === 0
+  const hasCacheData = (tokenData.totalCacheReadTokens || 0) > 0 || (tokenData.totalCacheWriteTokens || 0) > 0
 
   const isClickable = onCompact && !disabled && !isCompacting
 
@@ -131,24 +134,40 @@ export const AgentContextIndicator = memo(function AgentContextIndicator({
         </div>
       </TooltipTrigger>
       <TooltipContent side="top" sideOffset={8}>
-        <p className="text-xs">
+        <div className="text-xs space-y-1">
           {isEmpty ? (
             <span className="text-muted-foreground">
               Context: 0 / {formatTokens(contextWindow)}
             </span>
           ) : (
             <>
-              <span className="font-mono font-medium text-foreground">
-                {percentUsed.toFixed(1)}%
-              </span>
-              <span className="text-muted-foreground mx-1">·</span>
-              <span className="text-muted-foreground">
-                {formatTokens(totalTokens)} /{" "}
-                {formatTokens(contextWindow)} context
-              </span>
+              <div className="flex items-center gap-1">
+                <span className="font-mono font-medium text-foreground">
+                  {percentUsed.toFixed(1)}%
+                </span>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground">
+                  {formatTokens(totalTokens)} /{" "}
+                  {formatTokens(contextWindow)} context
+                </span>
+              </div>
+              {hasCacheData && (
+                <div className="text-muted-foreground flex items-center gap-2">
+                  {(tokenData.totalCacheReadTokens || 0) > 0 && (
+                    <span>
+                      <span className="text-green-500">↓</span> {formatTokens(tokenData.totalCacheReadTokens || 0)} read
+                    </span>
+                  )}
+                  {(tokenData.totalCacheWriteTokens || 0) > 0 && (
+                    <span>
+                      <span className="text-blue-500">↑</span> {formatTokens(tokenData.totalCacheWriteTokens || 0)} write
+                    </span>
+                  )}
+                </div>
+              )}
             </>
           )}
-        </p>
+        </div>
       </TooltipContent>
     </Tooltip>
   )

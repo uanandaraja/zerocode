@@ -64,6 +64,9 @@ export function createOpenCodeTransformer() {
               sessionId: assistantMsg.sessionID,
               inputTokens: assistantMsg.tokens.input,
               outputTokens: assistantMsg.tokens.output,
+              reasoningTokens: assistantMsg.tokens.reasoning,
+              cacheReadTokens: assistantMsg.tokens.cache?.read,
+              cacheWriteTokens: assistantMsg.tokens.cache?.write,
               totalTokens: assistantMsg.tokens.input + assistantMsg.tokens.output,
               totalCostUsd: assistantMsg.cost,
               durationMs: startTime ? Date.now() - startTime : undefined,
@@ -457,8 +460,11 @@ export interface UIMessage {
     sessionId?: string
     inputTokens?: number
     outputTokens?: number
+    reasoningTokens?: number
+    cacheReadTokens?: number
+    cacheWriteTokens?: number
     totalTokens?: number
-    cost?: number
+    totalCostUsd?: number
   }
 }
 
@@ -491,8 +497,11 @@ export function transformSessionMessages(
         sessionId: assistantInfo.sessionID,
         inputTokens: assistantInfo.tokens?.input,
         outputTokens: assistantInfo.tokens?.output,
+        reasoningTokens: assistantInfo.tokens?.reasoning,
+        cacheReadTokens: assistantInfo.tokens?.cache?.read,
+        cacheWriteTokens: assistantInfo.tokens?.cache?.write,
         totalTokens: (assistantInfo.tokens?.input || 0) + (assistantInfo.tokens?.output || 0),
-        cost: assistantInfo.cost,
+        totalCostUsd: assistantInfo.cost,
       }
     }
 

@@ -208,6 +208,9 @@ export type MessageMetadata = {
   sessionId?: string
   inputTokens?: number
   outputTokens?: number
+  reasoningTokens?: number
+  cacheReadTokens?: number
+  cacheWriteTokens?: number
   totalTokens?: number
   totalCostUsd?: number
   durationMs?: number

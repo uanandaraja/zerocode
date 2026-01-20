@@ -13,6 +13,9 @@ export interface AgentMessageMetadata {
   totalCostUsd?: number
   inputTokens?: number
   outputTokens?: number
+  reasoningTokens?: number
+  cacheReadTokens?: number
+  cacheWriteTokens?: number
   totalTokens?: number
   finalTextId?: string
   durationMs?: number
@@ -56,6 +59,8 @@ export const AgentMessageUsage = memo(function AgentMessageUsage({
     inputTokens = 0,
     outputTokens = 0,
     totalTokens = 0,
+    cacheReadTokens = 0,
+    cacheWriteTokens = 0,
     durationMs,
     resultSubtype,
   } = metadata
@@ -65,6 +70,7 @@ export const AgentMessageUsage = memo(function AgentMessageUsage({
   if (!hasUsage) return null
 
   const displayTokens = totalTokens || inputTokens + outputTokens
+  const hasCacheData = cacheReadTokens > 0 || cacheWriteTokens > 0
 
   return (
     <HoverCard openDelay={400} closeDelay={100}>
@@ -111,11 +117,26 @@ export const AgentMessageUsage = memo(function AgentMessageUsage({
 
           {/* Tokens group */}
           {displayTokens > 0 && (
-            <div className="flex justify-between text-xs gap-4 pt-1.5 mt-1 border-t border-border/50">
-              <span className="text-muted-foreground">Tokens:</span>
-              <span className="font-mono font-medium text-foreground">
-                {displayTokens.toLocaleString()}
-              </span>
+            <div className="pt-1.5 mt-1 border-t border-border/50 space-y-1">
+              <div className="flex justify-between text-xs gap-4">
+                <span className="text-muted-foreground">Tokens:</span>
+                <span className="font-mono font-medium text-foreground">
+                  {displayTokens.toLocaleString()}
+                </span>
+              </div>
+              {hasCacheData && (
+                <div className="flex justify-between text-xs gap-4">
+                  <span className="text-muted-foreground">Cache:</span>
+                  <span className="font-mono text-foreground flex items-center gap-2">
+                    {cacheReadTokens > 0 && (
+                      <span className="text-green-500">↓{formatTokens(cacheReadTokens)}</span>
+                    )}
+                    {cacheWriteTokens > 0 && (
+                      <span className="text-blue-500">↑{formatTokens(cacheWriteTokens)}</span>
+                    )}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>

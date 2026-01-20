@@ -1260,18 +1260,36 @@ function ChatViewInner({
 
   // Pre-compute token data for ChatInputArea to avoid passing unstable messages array
   // This prevents ChatInputArea from re-rendering on every streaming chunk
+  // NOTE: For context window calculation, we use the LAST assistant message's input tokens
+  // because each turn's input tokens already includes the full conversation history
   const messageTokenData = useMemo(() => {
-    let totalInputTokens = 0
+    let lastInputTokens = 0
     let totalOutputTokens = 0
+    let totalCacheReadTokens = 0
+    let totalCacheWriteTokens = 0
     let totalCostUsd = 0
+    
     for (const msg of messages) {
-      if (msg.metadata) {
-        totalInputTokens += msg.metadata.inputTokens || 0
+      if (msg.metadata && msg.role === "assistant") {
+        // Track the last assistant message's input tokens (cumulative context)
+        lastInputTokens = msg.metadata.inputTokens || 0
+        // Sum all output tokens across messages
         totalOutputTokens += msg.metadata.outputTokens || 0
+        // Track cache from last message for display
+        totalCacheReadTokens = msg.metadata.cacheReadTokens || 0
+        totalCacheWriteTokens = msg.metadata.cacheWriteTokens || 0
         totalCostUsd += msg.metadata.totalCostUsd || 0
       }
     }
-    return { totalInputTokens, totalOutputTokens, totalCostUsd, messageCount: messages.length }
+    // Context usage = last message's input (full conversation) + total output tokens generated
+    return { 
+      totalInputTokens: lastInputTokens, 
+      totalOutputTokens, 
+      totalCacheReadTokens, 
+      totalCacheWriteTokens, 
+      totalCostUsd, 
+      messageCount: messages.length 
+    }
   }, [messages])
 
   // Track previous streaming state to detect stream stop
