@@ -14,8 +14,8 @@ ROOT_DIR="$(cd "$DESKTOP_DIR/../.." && pwd)"
 VERSION=$(node -p "require('$DESKTOP_DIR/package.json').version")
 TAG="v$VERSION"
 
-PUBLIC_REPO="git@github.com:21st-dev/1code.git"
-PUBLIC_REPO_HTTPS="https://github.com/21st-dev/1code"
+PUBLIC_REPO="git@github.com:uanandaraja/zerocode.git"
+PUBLIC_REPO_HTTPS="https://github.com/uanandaraja/zerocode"
 PRIVATE_REPO="21st-dev/21st"
 TEMP_DIR="/tmp/1code-sync-$$"
 
