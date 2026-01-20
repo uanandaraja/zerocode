@@ -1,31 +1,16 @@
-# Contributing to 1Code
+# Contributing to ZeroCode
 
 ## Building from Source
 
-Prerequisites: Bun, Python, Xcode Command Line Tools (macOS)
+Prerequisites: Bun, Python, Xcode Command Line Tools (macOS), and `opencode` CLI installed globally.
 
 ```bash
+bun install -g opencode-ai  # Install opencode CLI
 bun install
 bun run dev      # Development with hot reload
 bun run build    # Production build
 bun run package:mac  # Create distributable
 ```
-
-## Open Source vs Hosted Version
-
-This is the open-source version of 1Code. Some features require the hosted backend at 1code.dev:
-
-| Feature | Open Source | Hosted (1code.dev) |
-|---------|-------------|-------------------|
-| Local AI chat | Yes | Yes |
-| Claude Code integration | Yes | Yes |
-| Git worktrees | Yes | Yes |
-| Terminal | Yes | Yes |
-| Sign in / Sync | No | Yes |
-| Background agents | No | Yes |
-| Auto-updates | No | Yes |
-| Private Discord & support | No | Yes |
-| Early access to new features | No | Yes |
 
 ## Analytics & Telemetry
 
@@ -37,8 +22,6 @@ Analytics (PostHog) and error tracking (Sentry) are **disabled by default** in o
 2. Create a feature branch
 3. Make your changes
 4. Submit a PR
-
-Join our [Discord](https://discord.gg/8ektTZGnj4) for discussions.
 
 ## License
 

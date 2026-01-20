@@ -2,8 +2,6 @@
 
 A GUI wrapper for [OpenCode](https://opencode.ai).
 
-Forked from [1Code](https://github.com/21st-dev/1code) by [21st.dev](https://21st.dev).
-
 > **Note:** Currently tested on macOS and Linux. Windows support is experimental and may have issues.
 
 ## Features
@@ -15,6 +13,14 @@ Forked from [1Code](https://github.com/21st-dev/1code) by [21st.dev](https://21s
 - **Integrated Terminal** - Full terminal access within the app
 - **Change Tracking** - Visual diffs and PR management
 
+## Prerequisites
+
+You need to have `opencode` installed globally:
+
+```bash
+bun install -g opencode-ai
+```
+
 ## Installation
 
 ### Build from source
@@ -22,18 +28,14 @@ Forked from [1Code](https://github.com/21st-dev/1code) by [21st.dev](https://21s
 ```bash
 # Prerequisites: Bun, Python, Xcode Command Line Tools (macOS)
 bun install
-bun run claude:download  # Download Claude binary (required!)
 bun run build
 bun run package:mac  # or package:win, package:linux
 ```
-
-> **Important:** The `claude:download` step downloads the Claude CLI binary which is required for the agent chat to work. If you skip this step, the app will build but agent functionality won't work.
 
 ## Development
 
 ```bash
 bun install
-bun run claude:download  # First time only
 bun run dev
 ```
 

@@ -135,9 +135,7 @@ export function UpdateBanner() {
   }
 
   const handleOpenChangelog = () => {
-    // Open changelog URL
-    window.desktopApi?.openExternal("https://1code.dev/changelog")
-    // Dismiss the banner
+    // Dismiss the banner (no external changelog URL)
     if (isMocking) {
       setMockStatus("dismissed")
     } else {

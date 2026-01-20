@@ -1,6 +1,6 @@
-import { app, BrowserWindow, session, Menu } from "electron"
+import { app, BrowserWindow, Menu } from "electron"
 import { join } from "path"
-import { readFileSync, existsSync, unlinkSync, readlinkSync } from "fs"
+import { existsSync, unlinkSync, readlinkSync } from "fs"
 import * as Sentry from "@sentry/electron/main"
 import { initDatabase, closeDatabase } from "./lib/db"
 import { serverManager } from "./lib/opencode"
@@ -20,15 +20,11 @@ import {
 // Dev mode detection
 const IS_DEV = !!process.env.ELECTRON_RENDERER_URL
 
-// Deep link protocol (must match package.json build.protocols.schemes)
-// Use different protocol in dev to avoid conflicts with production app
-const PROTOCOL = IS_DEV ? "twentyfirst-agents-dev" : "twentyfirst-agents"
-
 // Set dev mode userData path BEFORE requestSingleInstanceLock()
 // This ensures dev and prod have separate instance locks
 if (IS_DEV) {
   const { join } = require("path")
-  const devUserData = join(app.getPath("userData"), "..", "Agents Dev")
+  const devUserData = join(app.getPath("userData"), "..", "ZeroCode Dev")
   app.setPath("userData", devUserData)
   console.log("[Dev] Using separate userData path:", devUserData)
 }
@@ -63,40 +59,7 @@ export function getBaseUrl(): string {
 }
 
 export function getAppUrl(): string {
-  return process.env.ELECTRON_RENDERER_URL || "https://21st.dev/agents"
-}
-
-// Register protocol BEFORE app is ready
-
-/**
- * Register the app as the handler for our custom protocol.
- * On macOS, this may not take effect immediately on first install -
- * Launch Services caches protocol handlers and may need time to update.
- */
-function registerProtocol(): boolean {
-  let success = false
-
-  if (process.defaultApp) {
-    // Dev mode: need to pass execPath and script path
-    if (process.argv.length >= 2) {
-      success = app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [
-        process.argv[1]!,
-      ])
-    }
-  } else {
-    // Production mode
-    success = app.setAsDefaultProtocolClient(PROTOCOL)
-  }
-
-  return success
-}
-
-// Store initial registration result (set in app.whenReady())
-let initialRegistration = false
-
-// Verify registration (this checks if OS recognizes us as the handler)
-function verifyProtocolRegistration(): void {
-  // Verification is done silently - registration issues will be apparent if deep links don't work
+  return process.env.ELECTRON_RENDERER_URL || ""
 }
 
 // Clean up stale lock files from crashed instances
@@ -168,44 +131,20 @@ if (gotTheLock) {
   app.whenReady().then(async () => {
     // Set dev mode app name (userData path was already set before requestSingleInstanceLock)
     if (IS_DEV) {
-      app.name = "Agents Dev"
+      app.name = "ZeroCode Dev"
     }
-
-    // Register protocol handler (must be after app is ready)
-    initialRegistration = registerProtocol()
 
     // Set app user model ID for Windows (different in dev to avoid taskbar conflicts)
     if (process.platform === "win32") {
-      app.setAppUserModelId(IS_DEV ? "dev.21st.1code.dev" : "dev.21st.1code")
+      app.setAppUserModelId(IS_DEV ? "dev.21st.zerocode.dev" : "dev.21st.zerocode")
     }
 
-    console.log(`[App] Starting 1Code${IS_DEV ? " (DEV)" : ""}...`)
+    console.log(`[App] Starting ZeroCode${IS_DEV ? " (DEV)" : ""}...`)
 
-    // Verify protocol registration after app is ready
-    // This helps diagnose first-install issues where the protocol isn't recognized yet
-    verifyProtocolRegistration()
-
-    // Get Claude Code version for About panel
-    let claudeCodeVersion = "unknown"
-    try {
-      const isDev = !app.isPackaged
-      const versionPath = isDev
-        ? join(app.getAppPath(), "resources/bin/VERSION")
-        : join(process.resourcesPath, "bin/VERSION")
-
-      if (existsSync(versionPath)) {
-        const versionContent = readFileSync(versionPath, "utf-8")
-        claudeCodeVersion = versionContent.split("\n")[0]?.trim() || "unknown"
-      }
-    } catch (error) {
-      console.warn("[App] Failed to read Claude Code version:", error)
-    }
-
-    // Set About panel options with Claude Code version
+    // Set About panel options
     app.setAboutPanelOptions({
-      applicationName: "1Code",
+      applicationName: "ZeroCode",
       applicationVersion: app.getVersion(),
-      version: `Claude Code ${claudeCodeVersion}`,
       copyright: "Copyright © 2026 21st.dev",
     })
 
@@ -219,7 +158,7 @@ if (gotTheLock) {
         {
           label: app.name,
           submenu: [
-            { role: "about", label: "About 1Code" },
+            { role: "about", label: "About ZeroCode" },
             {
               label: updateAvailable
                 ? `Update to v${availableVersion}...`

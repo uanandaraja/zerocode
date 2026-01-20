@@ -2,7 +2,7 @@
   "name": "zerocode",
   "version": "0.0.22",
   "private": true,
-  "description": "1Code - UI for parallel work with AI agents",
+  "description": "ZeroCode - UI for parallel work with AI agents",
   "author": "21st.dev",
   "main": "out/main/index.js",
   "scripts": {
@@ -17,7 +17,6 @@
     "dist:manifest": "node scripts/generate-update-manifest.mjs",
     "dist:upload": "node scripts/upload-release.mjs",
     "release": "rm -rf release && bun run build && bun run package:mac && bun run dist:manifest && ./scripts/upload-release-wrangler.sh",
-    "sync:public": "./scripts/sync-to-public.sh",
     "icon:generate": "node scripts/generate-icon.mjs",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
@@ -121,17 +120,9 @@
     "vite": "^6.3.4"
   },
   "build": {
-    "appId": "dev.21st.agents",
-    "productName": "1Code",
+    "appId": "dev.21st.zerocode",
+    "productName": "ZeroCode",
     "npmRebuild": true,
-    "protocols": [
-      {
-        "name": "1Code",
-        "schemes": [
-          "twentyfirst-agents"
-        ]
-      }
-    ],
     "directories": {
       "buildResources": "build",
       "output": "release"

@@ -207,32 +207,34 @@ export const AssistantMessageItem = memo(function AssistantMessageItem({
 }: AssistantMessageItemProps) {
   const rawParts = message?.parts || []
 
-  // OpenCode includes the user's prompt as the first text part before any tools during streaming.
+  // OpenCode always echoes the user's prompt as the first text part of assistant messages.
   // We need to skip it since it's already rendered in the user bubble.
-  // BUT: only do this if the message actually has tools - if it's a text-only response, keep the text.
+  // 
+  // Detection strategy: The echoed user prompt is ALWAYS the first text part, and there's
+  // always actual AI content after it (either tools or additional text). So we skip the
+  // first text part if there are subsequent non-empty parts.
   const messageParts = useMemo(() => {
-    // Check if this message has any tools
-    const hasTools = rawParts.some((part: any) => part.type?.startsWith("tool-"))
+    if (rawParts.length === 0) return rawParts
     
-    // If no tools, don't filter anything - keep all text parts
-    if (!hasTools) {
-      return rawParts
+    // Find the first text part
+    const firstTextIndex = rawParts.findIndex((p: any) => p.type === "text")
+    if (firstTextIndex === -1) return rawParts  // No text parts at all
+    
+    // Check if there's any meaningful content AFTER the first text part
+    // (either more text with content, or any tools)
+    const hasContentAfterFirst = rawParts.slice(firstTextIndex + 1).some((p: any) => {
+      if (p.type === "text") return p.text?.trim()  // Non-empty text
+      if (p.type?.startsWith("tool-")) return true   // Any tool
+      return false
+    })
+    
+    // If there's content after the first text part, skip the first text (it's the echoed user prompt)
+    if (hasContentAfterFirst) {
+      return rawParts.filter((_: any, idx: number) => idx !== firstTextIndex)
     }
     
-    // Filter out the first text part that appears before any tool (user's echoed prompt)
-    let foundTool = false
-    let skippedUserText = false
-    return rawParts.filter((part: any) => {
-      if (part.type?.startsWith("tool-")) {
-        foundTool = true
-      }
-      // Skip the first text part that appears before any tool (user's echoed prompt)
-      if (part.type === "text" && !foundTool && !skippedUserText) {
-        skippedUserText = true
-        return false
-      }
-      return true
-    })
+    // Otherwise, the first text IS the actual response (no echo scenario or single-text response)
+    return rawParts
   }, [rawParts])
 
   const contentParts = useMemo(() =>
