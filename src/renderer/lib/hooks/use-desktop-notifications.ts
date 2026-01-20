@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback } from "react"
 import { useAtom } from "jotai"
 import { atomWithStorage } from "jotai/utils"
-import { isDesktopApp } from "../../../lib/utils/platform"
+import { isDesktopApp } from "../utils/platform"
 
 // Track pending notifications count for badge
 const pendingNotificationsAtom = atomWithStorage<number>(

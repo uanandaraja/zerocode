@@ -345,8 +345,8 @@ export const messageTokenDataAtom = atom((get) => {
     if (metadata && msg?.role === "assistant") {
       // Track the last assistant message's input tokens (cumulative context)
       lastInputTokens = metadata.inputTokens || 0
-      // Sum all output tokens across messages
-      outputTokens += metadata.outputTokens || 0
+      // Track the last assistant message's output tokens (not sum - input already includes history)
+      outputTokens = metadata.outputTokens || 0
       // Track cache from last message for display
       cacheReadTokens = metadata.cacheReadTokens || 0
       cacheWriteTokens = metadata.cacheWriteTokens || 0

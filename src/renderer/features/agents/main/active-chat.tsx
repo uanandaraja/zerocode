@@ -123,7 +123,7 @@ import { AgentSendButton } from "../components/agent-send-button"
 import { PreviewSetupHoverCard } from "../components/preview-setup-hover-card"
 import { useAgentsFileUpload } from "../hooks/use-agents-file-upload"
 import { useChangedFilesTracking } from "../hooks/use-changed-files-tracking"
-import { useDesktopNotifications } from "../hooks/use-desktop-notifications"
+import { useDesktopNotifications } from "../../../lib/hooks/use-desktop-notifications"
 import { useFocusInputOnEnter } from "../hooks/use-focus-input-on-enter"
 import { useHaptic } from "../hooks/use-haptic"
 import { useToggleFocusOnCmdEsc } from "../hooks/use-toggle-focus-on-cmd-esc"
@@ -1273,8 +1273,8 @@ function ChatViewInner({
       if (msg.metadata && msg.role === "assistant") {
         // Track the last assistant message's input tokens (cumulative context)
         lastInputTokens = msg.metadata.inputTokens || 0
-        // Sum all output tokens across messages
-        totalOutputTokens += msg.metadata.outputTokens || 0
+        // Track the last assistant message's output tokens (not sum - input already includes history)
+        totalOutputTokens = msg.metadata.outputTokens || 0
         // Track cache from last message for display
         totalCacheReadTokens = msg.metadata.cacheReadTokens || 0
         totalCacheWriteTokens = msg.metadata.cacheWriteTokens || 0
