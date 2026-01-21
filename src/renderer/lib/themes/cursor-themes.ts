@@ -5,7 +5,7 @@
  * both UI colors and tokenColors for syntax highlighting.
  */
 
-import type { VSCodeFullTheme } from "../atoms"
+import type { VSCodeFullTheme } from "../../stores"
 
 /**
  * Cursor Dark theme colors and syntax highlighting

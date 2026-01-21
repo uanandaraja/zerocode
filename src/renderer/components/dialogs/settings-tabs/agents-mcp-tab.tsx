@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react"
 import { ChevronRight } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
-import { useAtomValue } from "jotai"
-import { sessionInfoAtom } from "../../../lib/atoms"
 import { cn } from "../../../lib/utils"
+import { useUIStore } from "../../../stores"
 import { OriginalMCPIcon } from "../../ui/icons"
 
 // Hook to detect narrow screen
@@ -150,7 +149,7 @@ export function AgentsMcpTab() {
   const isNarrowScreen = useIsNarrowScreen()
   const [expandedServer, setExpandedServer] = useState<string | null>(null)
 
-  const sessionInfo = useAtomValue(sessionInfoAtom)
+  const sessionInfo = useUIStore((state) => state.sessionInfo)
   const mcpServers = sessionInfo?.mcpServers || []
   const tools = sessionInfo?.tools || []
 

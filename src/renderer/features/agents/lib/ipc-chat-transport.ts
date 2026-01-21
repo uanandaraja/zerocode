@@ -1,20 +1,9 @@
 import * as Sentry from "@sentry/electron/renderer"
 import type { ChatTransport, UIMessage } from "ai"
 import { toast } from "sonner"
-import {
-  extendedThinkingEnabledAtom,
-  sessionInfoAtom,
-} from "../../../lib/atoms"
-import { appStore } from "../../../lib/jotai-store"
 import { showAgentQuestionNotification } from "../../../lib/hooks/use-desktop-notifications"
 import { trpcClient } from "../../../lib/trpc"
-import {
-  askUserQuestionResultsAtom,
-  compactingSubChatsAtom,
-  pendingUserQuestionsAtom,
-  selectedProviderAtom,
-  selectedModelAtom,
-} from "../atoms"
+import { useUIStore, useSessionStore } from "../../../stores"
 import { useAgentSubChatStore } from "../stores/sub-chat-store"
 
 // Error categories and their user-friendly messages
@@ -123,12 +112,12 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
     const sessionId = (lastAssistant as any)?.metadata?.sessionId
 
     // Read extended thinking setting dynamically (so toggle applies to existing chats)
-    const thinkingEnabled = appStore.get(extendedThinkingEnabledAtom)
+    const thinkingEnabled = useUIStore.getState().preferences.extendedThinking
     const maxThinkingTokens = thinkingEnabled ? 128_000 : undefined
 
     // Read provider/model selection dynamically (so changes apply to existing chats)
-    const selectedProvider = appStore.get(selectedProviderAtom)
-    const selectedModel = appStore.get(selectedModelAtom)
+    const selectedProvider = useUIStore.getState().preferences.selectedProvider
+    const selectedModel = useUIStore.getState().preferences.selectedModel
 
     const currentMode =
       useAgentSubChatStore
@@ -157,8 +146,8 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
             onData: (chunk: UIMessageChunk) => {
               // Handle AskUserQuestion - show question UI
               if (chunk.type === "ask-user-question") {
-                appStore.set(pendingUserQuestionsAtom, {
-                  subChatId: this.config.subChatId,
+                useSessionStore.getState().setPendingQuestions({
+                  sessionId: this.config.subChatId,
                   toolUseId: chunk.toolUseId,
                   questions: chunk.questions,
                 })
@@ -168,37 +157,31 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
 
               // Handle AskUserQuestion timeout - clear pending question immediately
               if (chunk.type === "ask-user-question-timeout") {
-                const pending = appStore.get(pendingUserQuestionsAtom)
+                const pending = useSessionStore.getState().pendingQuestions
                 if (pending && pending.toolUseId === chunk.toolUseId) {
-                  appStore.set(pendingUserQuestionsAtom, null)
+                  useSessionStore.getState().setPendingQuestions(null)
                 }
               }
 
               // Handle AskUserQuestion result - store for real-time updates
               if (chunk.type === "ask-user-question-result") {
-                const currentResults = appStore.get(askUserQuestionResultsAtom)
-                const newResults = new Map(currentResults)
-                newResults.set(chunk.toolUseId, chunk.result)
-                appStore.set(askUserQuestionResultsAtom, newResults)
+                useSessionStore.getState().setQuestionResult(chunk.toolUseId, chunk.result)
               }
 
-              // Handle compacting status - track in atom for UI display
+              // Handle compacting status - track in store for UI display
               if (chunk.type === "system-Compact") {
-                const compacting = appStore.get(compactingSubChatsAtom)
-                const newCompacting = new Set(compacting)
                 if (chunk.state === "input-streaming") {
                   // Compacting started
-                  newCompacting.add(this.config.subChatId)
+                  useSessionStore.getState().setCompacting(this.config.subChatId, true)
                 } else {
                   // Compacting finished (output-available)
-                  newCompacting.delete(this.config.subChatId)
+                  useSessionStore.getState().setCompacting(this.config.subChatId, false)
                 }
-                appStore.set(compactingSubChatsAtom, newCompacting)
               }
 
               // Handle session init - store MCP servers, plugins, tools info
               if (chunk.type === "session-init") {
-                appStore.set(sessionInfoAtom, {
+                useUIStore.getState().setSessionInfo({
                   tools: chunk.tools,
                   mcpServers: chunk.mcpServers,
                   plugins: chunk.plugins,
@@ -245,9 +228,9 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
                 chunk.type !== "start-step"
 
               if (shouldClearOnChunk) {
-                const pending = appStore.get(pendingUserQuestionsAtom)
-                if (pending && pending.subChatId === this.config.subChatId) {
-                  appStore.set(pendingUserQuestionsAtom, null)
+                const pending = useSessionStore.getState().pendingQuestions
+                if (pending && pending.sessionId === this.config.subChatId) {
+                  useSessionStore.getState().setPendingQuestions(null)
                 }
               }
 

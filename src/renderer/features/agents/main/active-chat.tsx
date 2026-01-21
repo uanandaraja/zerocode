@@ -49,7 +49,8 @@ import {
 // e2b API routes are used instead of useSandboxManager for agents
 // import { clearSubChatSelectionAtom, isSubChatMultiSelectModeAtom, selectedSubChatIdsAtom } from "@/lib/atoms/agent-subchat-selection"
 import { Chat, useChat } from "@ai-sdk/react"
-import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
+import { useSetAtom } from "jotai"
+// Note: jotai is still used for some atoms that haven't been migrated yet
 import {
   ChevronDown,
   Columns2,
@@ -76,44 +77,21 @@ import { createPortal } from "react-dom"
 import { toast } from "sonner"
 import { trackMessageSent } from "../../../lib/analytics"
 import { apiFetch } from "../../../lib/api-fetch"
-import { soundNotificationsEnabledAtom } from "../../../lib/atoms"
-import { appStore } from "../../../lib/jotai-store"
+
 import { api } from "../../../lib/api-bridge"
 import { trpc, trpcClient } from "../../../lib/trpc"
 import { getQueryClient } from "../../../contexts/TRPCProvider"
 import { cn } from "../../../lib/utils"
 import { getShortcutKey, isDesktopApp } from "../../../lib/utils/platform"
-import { terminalSidebarOpenAtom } from "../../terminal/atoms"
 import { TerminalSidebar } from "../../terminal/terminal-sidebar"
 import {
-  agentsDiffSidebarWidthAtom,
-  agentsPreviewSidebarOpenAtom,
-  agentsPreviewSidebarWidthAtom,
-  agentsScrollPositionsAtom,
-  agentsSubChatsSidebarModeAtom,
-  agentsSubChatUnseenChangesAtom,
-  agentsUnseenChangesAtom,
-  clearLoading,
-  compactingSubChatsAtom,
-  diffSidebarOpenAtomFamily,
-  isPlanModeAtom,
-  justCreatedIdsAtom,
-  lastSelectedModelIdAtom,
-  loadingSubChatsAtom,
-  pendingPrMessageAtom,
-  pendingReviewMessageAtom,
-  pendingUserQuestionsAtom,
-  pendingPlanApprovalsAtom,
-  QUESTIONS_SKIPPED_MESSAGE,
+  useUIStore,
+  useSessionStore,
   scrollPositionsCacheStore,
-  selectedAgentChatIdAtom,
-  setLoading,
-  subChatFilesAtom,
-  undoStackAtom,
-  zenModeAtom,
+  QUESTIONS_SKIPPED_MESSAGE,
   type ScrollPositionData,
   type UndoItem,
-} from "../atoms"
+} from "../../../stores"
 import {
   AgentsSlashCommand,
   COMMAND_PROMPTS,
@@ -144,7 +122,6 @@ import { AgentBashTool } from "../ui/agent-bash-tool"
 import { AgentContextIndicator } from "../ui/agent-context-indicator"
 import {
   AgentDiffView,
-  diffViewModeAtom,
   DiffModeEnum,
   splitUnifiedDiffByFile,
   type AgentDiffViewRef,
@@ -188,11 +165,13 @@ import {
   clearSubChatDraft,
   getSubChatDraft,
 } from "../lib/drafts"
-const clearSubChatSelectionAtom = atom(null, () => {})
-const isSubChatMultiSelectModeAtom = atom(false)
-const selectedSubChatIdsAtom = atom(new Set<string>())
-// import { selectedTeamIdAtom } from "@/lib/atoms/team"
-const selectedTeamIdAtom = atom<string | null>(null)
+
+// Placeholder values for features not yet implemented in desktop
+// These were previously Jotai atoms but are simplified for desktop
+const EMPTY_SET = new Set<string>()
+const MULTI_SELECT_MODE_DISABLED = false
+const NO_TEAM_SELECTED: string | null = null
+
 // import type { PlanType } from "@/lib/config/subscription-plans"
 type PlanType = string
 
@@ -886,11 +865,10 @@ function ChatViewInner({
   }, [])
 
   // Scroll position persistence (like canvas)
-  // Atom is used for localStorage persistence, but we also need a module-level cache
-  // for synchronous access during tab switches (atom updates are async)
-  const [scrollPositions, setScrollPositions] = useAtom(
-    agentsScrollPositionsAtom,
-  )
+  // Zustand store is used for localStorage persistence, but we also need a module-level cache
+  // for synchronous access during tab switches (state updates are async)
+  const scrollPositions = useSessionStore((s) => s.scrollPositions)
+  const setScrollPosition = useSessionStore((s) => s.setScrollPosition)
 
   // Skip auto-scroll immediately after restore (state update is async, so use ref)
   const justRestoredRef = useRef(false)
@@ -982,8 +960,9 @@ function ChatViewInner({
     [subChatId],
   )
 
-  // Plan mode state (read from global atom)
-  const [isPlanMode, setIsPlanMode] = useAtom(isPlanModeAtom)
+  // Plan mode state (read from Zustand store)
+  const isPlanMode = useUIStore((s) => s.isPlanMode)
+  const setIsPlanMode = useUIStore((s) => s.setIsPlanMode)
 
   // Mutation for updating sub-chat mode in database
   const updateSubChatModeMutation = api.agents.updateSubChatMode.useMutation({
@@ -1160,7 +1139,7 @@ function ChatViewInner({
   const isStreaming = status === "streaming" || status === "submitted"
 
   // Track compacting status from SDK
-  const compactingSubChats = useAtomValue(compactingSubChatsAtom)
+  const compactingSubChats = useSessionStore((s) => s.compactingSessions)
   const isCompacting = compactingSubChats.has(subChatId)
 
   // Handler to trigger manual context compaction
@@ -1197,24 +1176,26 @@ function ChatViewInner({
     lastAssistantMsgIdRef.current = lastAssistantMsg?.id
   }, [status, messages])
 
-  // Sync loading status to atom for UI indicators
+  // Sync loading status to store for UI indicators
   // When streaming starts, set loading. When it stops, clear loading.
   // Unseen changes, sound notification, and sidebar refresh are handled in onFinish callback
-  const setLoadingSubChats = useSetAtom(loadingSubChatsAtom)
+  const setSessionLoading = useSessionStore((s) => s.setLoading)
+  const clearSessionLoading = useSessionStore((s) => s.clearLoading)
 
   useEffect(() => {
     const storedParentChatId = agentChatStore.getParentChatId(subChatId)
     if (!storedParentChatId) return
 
     if (isStreaming) {
-      setLoading(setLoadingSubChats, subChatId, storedParentChatId)
+      setSessionLoading(subChatId, storedParentChatId)
     } else {
-      clearLoading(setLoadingSubChats, subChatId)
+      clearSessionLoading(subChatId)
     }
-  }, [isStreaming, subChatId, setLoadingSubChats])
+  }, [isStreaming, subChatId, setSessionLoading, clearSessionLoading])
 
   // Watch for pending PR message and send it
-  const [pendingPrMessage, setPendingPrMessage] = useAtom(pendingPrMessageAtom)
+  const pendingPrMessage = useUIStore((s) => s.pendingPrMessage)
+  const setPendingPrMessage = useUIStore((s) => s.setPendingPrMessage)
 
   useEffect(() => {
     if (pendingPrMessage && !isStreaming) {
@@ -1230,9 +1211,8 @@ function ChatViewInner({
   }, [pendingPrMessage, isStreaming, sendMessage, setPendingPrMessage])
 
   // Watch for pending Review message and send it
-  const [pendingReviewMessage, setPendingReviewMessage] = useAtom(
-    pendingReviewMessageAtom,
-  )
+  const pendingReviewMessage = useUIStore((s) => s.pendingReviewMessage)
+  const setPendingReviewMessage = useUIStore((s) => s.setPendingReviewMessage)
 
   useEffect(() => {
     if (pendingReviewMessage && !isStreaming) {
@@ -1248,9 +1228,8 @@ function ChatViewInner({
   }, [pendingReviewMessage, isStreaming, sendMessage, setPendingReviewMessage])
 
   // Pending user questions from AskUserQuestion tool
-  const [pendingQuestions, setPendingQuestions] = useAtom(
-    pendingUserQuestionsAtom,
-  )
+  const pendingQuestions = useSessionStore((s) => s.pendingQuestions)
+  const setPendingQuestions = useSessionStore((s) => s.setPendingQuestions)
 
   // Memoize the last assistant message to avoid unnecessary recalculations
   const lastAssistantMessage = useMemo(
@@ -1314,15 +1293,13 @@ function ChatViewInner({
 
       // Streaming just stopped - if there's a pending question for this chat,
       // clear it after a brief delay (backend already handled the abort)
-      if (pendingQuestions?.subChatId === subChatId) {
+      if (pendingQuestions?.sessionId === subChatId) {
         const timeout = setTimeout(() => {
           // Re-check if still showing the same question (might have been cleared by other means)
-          setPendingQuestions((current) => {
-            if (current?.subChatId === subChatId) {
-              return null
-            }
-            return current
-          })
+          const current = useSessionStore.getState().pendingQuestions
+          if (current?.sessionId === subChatId) {
+            setPendingQuestions(null)
+          }
         }, 150) // Small delay to allow for race conditions with transport chunks
         return () => {
           clearTimeout(timeout)
@@ -1331,7 +1308,7 @@ function ChatViewInner({
       }
       return () => clearTimeout(flagTimeout)
     }
-  }, [isStreaming, subChatId, pendingQuestions?.subChatId, pendingQuestions?.toolUseId, setPendingQuestions])
+  }, [isStreaming, subChatId, pendingQuestions?.sessionId, pendingQuestions?.toolUseId, setPendingQuestions])
 
   // Sync pending questions with messages state
   // This handles: 1) restoring on chat switch, 2) clearing when question is answered/timed out
@@ -1349,8 +1326,8 @@ function ChatViewInner({
 
     // If streaming and we already have a pending question for this chat, keep it
     // (transport will manage it via chunks)
-    if (isStreaming && pendingQuestions?.subChatId === subChatId) {
-      // But if the question in messages is already answered, clear the atom
+    if (isStreaming && pendingQuestions?.sessionId === subChatId) {
+      // But if the question in messages is already answered, clear the store
       if (pendingQuestions && !pendingQuestionPart) {
         // Check if the specific toolUseId is now answered
         const answeredPart = lastAssistantMessage?.parts?.find(
@@ -1377,12 +1354,12 @@ function ChatViewInner({
     // the backend is waiting for user response.
     if (pendingQuestionPart) {
       // Don't restore - if there's an existing pending question for this chat, clear it
-      if (pendingQuestions?.subChatId === subChatId) {
+      if (pendingQuestions?.sessionId === subChatId) {
         setPendingQuestions(null)
       }
     } else {
       // No pending question - clear if belongs to this sub-chat
-      if (pendingQuestions?.subChatId === subChatId) {
+      if (pendingQuestions?.sessionId === subChatId) {
         setPendingQuestions(null)
       }
     }
@@ -1395,7 +1372,7 @@ function ChatViewInner({
       try {
         await trpcClient.claude.respondToolApproval.mutate({
           toolUseId: pendingQuestions.toolUseId,
-          subChatId: pendingQuestions.subChatId,
+          subChatId: pendingQuestions.sessionId,
           approved: true,
           updatedInput: { questions: pendingQuestions.questions, answers },
         })
@@ -1410,7 +1387,7 @@ function ChatViewInner({
   // Handle skipping questions
   const handleQuestionsSkip = useCallback(async () => {
     if (!pendingQuestions) return
-    const { toolUseId, subChatId: questionSubChatId } = pendingQuestions
+    const { toolUseId, sessionId: questionSubChatId } = pendingQuestions
 
     // Clear UI immediately - don't wait for backend
     // This ensures dialog closes even if stream was already aborted
@@ -1648,13 +1625,10 @@ function ChatViewInner({
       }
       // Save to SYNCHRONOUS cache first (for immediate reads on next tab switch)
       scrollPositionsCacheStore.set(currentSubChatId, scrollData)
-      // Also save to atom for localStorage persistence
-      setScrollPositions((prev) => ({
-        ...prev,
-        [currentSubChatId]: scrollData,
-      }))
+      // Also save to Zustand store for localStorage persistence
+      setScrollPosition(currentSubChatId, scrollData)
     }
-  }, [subChatId, messages.length, setScrollPositions])
+  }, [subChatId, messages.length, setScrollPosition])
 
   // Restore scroll position on mount with content-ready detection
   useLayoutEffect(() => {
@@ -2026,23 +2000,16 @@ function ChatViewInner({
     return false
   }, [messages])
 
-  // Update pending plan approvals atom for sidebar indicators
-  const setPendingPlanApprovals = useSetAtom(pendingPlanApprovalsAtom)
+  // Update pending plan approvals store for sidebar indicators
+  const addPendingPlanApproval = useSessionStore((s) => s.addPendingPlanApproval)
+  const removePendingPlanApproval = useSessionStore((s) => s.removePendingPlanApproval)
   useEffect(() => {
-    setPendingPlanApprovals((prev: Set<string>) => {
-      const newSet = new Set(prev)
-      if (hasUnapprovedPlan) {
-        newSet.add(subChatId)
-      } else {
-        newSet.delete(subChatId)
-      }
-      // Only return new set if it changed
-      if (newSet.size !== prev.size || ![...newSet].every((id) => prev.has(id))) {
-        return newSet
-      }
-      return prev
-    })
-  }, [hasUnapprovedPlan, subChatId, setPendingPlanApprovals])
+    if (hasUnapprovedPlan) {
+      addPendingPlanApproval(subChatId)
+    } else {
+      removePendingPlanApproval(subChatId)
+    }
+  }, [hasUnapprovedPlan, subChatId, addPendingPlanApproval, removePendingPlanApproval])
 
   // Keyboard shortcut: Cmd+Enter to approve plan
   useEffect(() => {
@@ -2066,16 +2033,9 @@ function ChatViewInner({
   // Clean up pending plan approval when unmounting
   useEffect(() => {
     return () => {
-      setPendingPlanApprovals((prev: Set<string>) => {
-        if (prev.has(subChatId)) {
-          const newSet = new Set(prev)
-          newSet.delete(subChatId)
-          return newSet
-        }
-        return prev
-      })
+      removePendingPlanApproval(subChatId)
     }
-  }, [subChatId, setPendingPlanApprovals])
+  }, [subChatId, removePendingPlanApproval])
 
   // Compute sticky top class for user messages
   const stickyTopClass = isMobile
@@ -2142,11 +2102,11 @@ function ChatViewInner({
 
       {/* User questions panel - shows when AskUserQuestion tool is called */}
       {/* Only show if the pending question belongs to THIS sub-chat */}
-      {pendingQuestions && pendingQuestions.subChatId === subChatId && (
+      {pendingQuestions && pendingQuestions.sessionId === subChatId && (
         <div className="px-4 relative z-20">
           <div className="w-full px-2 max-w-3xl mx-auto">
             <AgentUserQuestion
-              pendingQuestions={pendingQuestions}
+              pendingQuestions={{ ...pendingQuestions, subChatId: pendingQuestions.sessionId }}
               onAnswer={handleQuestionsAnswer}
               onSkip={handleQuestionsSkip}
             />
@@ -2156,7 +2116,7 @@ function ChatViewInner({
 
       {/* Sub-chat status card - pinned above input */}
       {(isStreaming || changedFilesForSubChat.length > 0) &&
-        !(pendingQuestions?.subChatId === subChatId) && (
+        !(pendingQuestions?.sessionId === subChatId) && (
           <div className="px-2 -mb-6 relative z-0">
             <div className="w-full max-w-3xl mx-auto px-2">
               <SubChatStatusCard
@@ -2227,33 +2187,35 @@ export function ChatView({
   onOpenDiff?: () => void
   onOpenTerminal?: () => void
 }) {
-  const [selectedTeamId] = useAtom(selectedTeamIdAtom)
-  const [selectedModelId] = useAtom(lastSelectedModelIdAtom)
-  const [isPlanMode] = useAtom(isPlanModeAtom)
-  const setLoadingSubChats = useSetAtom(loadingSubChatsAtom)
-  const unseenChanges = useAtomValue(agentsUnseenChangesAtom)
-  const setUnseenChanges = useSetAtom(agentsUnseenChangesAtom)
-  const setSubChatUnseenChanges = useSetAtom(agentsSubChatUnseenChangesAtom)
-  const setJustCreatedIds = useSetAtom(justCreatedIdsAtom)
-  const selectedChatId = useAtomValue(selectedAgentChatIdAtom)
-  const setUndoStack = useSetAtom(undoStackAtom)
+  // Team selection not implemented in desktop - use constant placeholder
+  const selectedTeamId = NO_TEAM_SELECTED
+  const selectedModelId = useUIStore((s) => s.lastSelectedModelId)
+  const isPlanMode = useUIStore((s) => s.isPlanMode)
+  const setSessionLoading = useSessionStore((s) => s.setLoading)
+  const clearSessionLoading = useSessionStore((s) => s.clearLoading)
+  const unseenChanges = useSessionStore((s) => s.unseenChanges)
+  const markUnseen = useSessionStore((s) => s.markUnseen)
+  const setSubChatUnseenChanges = markUnseen // alias for compatibility
+  const setUnseenChanges = markUnseen // alias for compatibility
+  const addJustCreated = useSessionStore((s) => s.addJustCreated)
+  const selectedChatId = useSessionStore((s) => s.workspaceId)
+  const [undoStack, setUndoStackLocal] = useState<UndoItem[]>([])
   const { notifyAgentComplete } = useDesktopNotifications()
 
   // Check if any chat has unseen changes
   const hasAnyUnseenChanges = unseenChanges.size > 0
   const [, forceUpdate] = useState({})
-  const [isPreviewSidebarOpen, setIsPreviewSidebarOpen] = useAtom(
-    agentsPreviewSidebarOpenAtom,
-  )
+  const isPreviewSidebarOpen = useUIStore((s) => s.previewSidebar.open)
+  const setIsPreviewSidebarOpen = useUIStore((s) => s.setPreviewSidebarOpen)
   // Per-chat diff sidebar state - each chat remembers its own open/close state
-  const diffSidebarAtom = useMemo(
-    () => diffSidebarOpenAtomFamily(chatId),
-    [chatId],
-  )
-  const [isDiffSidebarOpen, setIsDiffSidebarOpen] = useAtom(diffSidebarAtom)
-  const [isTerminalSidebarOpen, setIsTerminalSidebarOpen] = useAtom(
-    terminalSidebarOpenAtom,
-  )
+  const isDiffSidebarOpen = useSessionStore((s) => s.diffSidebarOpen[chatId] ?? false)
+  const setIsDiffSidebarOpenStore = useSessionStore((s) => s.setDiffSidebarOpen)
+  const setIsDiffSidebarOpen = useCallback((open: boolean) => {
+    setIsDiffSidebarOpenStore(chatId, open)
+  }, [chatId, setIsDiffSidebarOpenStore])
+  // Terminal sidebar state
+  const isTerminalSidebarOpen = useUIStore((s) => s.terminalSidebar.open)
+  const setIsTerminalSidebarOpen = useUIStore((s) => s.setTerminalSidebarOpen)
   const [diffStats, setDiffStats] = useState({
     fileCount: 0,
     additions: 0,
@@ -2271,11 +2233,26 @@ export function ChatView({
   const [prefetchedFileContents, setPrefetchedFileContents] = useState<
     Record<string, string>
   >({})
-  const [diffMode, setDiffMode] = useAtom(diffViewModeAtom)
-  const subChatsSidebarMode = useAtomValue(agentsSubChatsSidebarModeAtom)
+  // Local state with localStorage persistence for diff view mode
+  const [diffMode, setDiffMode] = useState<DiffModeEnum>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("agents-diff:view-mode")
+      if (stored === "split") return DiffModeEnum.Split
+    }
+    return DiffModeEnum.Unified
+  })
+  
+  // Persist to localStorage on change
+  useEffect(() => {
+    localStorage.setItem("agents-diff:view-mode", diffMode)
+  }, [diffMode])
+  const subChatsSidebarMode = useUIStore((s) => s.sessionsSidebarMode)
 
   // Track diff sidebar width for responsive header
-  const storedDiffSidebarWidth = useAtomValue(agentsDiffSidebarWidthAtom)
+  const storedDiffSidebarWidth = useUIStore((s) => s.diffSidebar.width)
+  const setStoredDiffSidebarWidth = useUIStore((s) => s.setDiffSidebarWidth)
+  const storedPreviewSidebarWidth = useUIStore((s) => s.previewSidebar.width)
+  const setStoredPreviewSidebarWidth = useUIStore((s) => s.setPreviewSidebarWidth)
   const diffSidebarRef = useRef<HTMLDivElement>(null)
   const diffViewRef = useRef<AgentDiffViewRef>(null)
   const [diffSidebarWidth, setDiffSidebarWidth] = useState(
@@ -2328,26 +2305,20 @@ export function ChatView({
   }, [isDiffSidebarOpen, storedDiffSidebarWidth])
 
   // Track changed files across all sub-chats for throttled diff refresh
-  const subChatFiles = useAtomValue(subChatFilesAtom)
+  const subChatFiles = useSessionStore((s) => s.subChatFiles)
   // Initialize to Date.now() to prevent double-fetch on mount
   // (the "mount" effect already fetches, throttle should wait)
   const lastDiffFetchTimeRef = useRef<number>(Date.now())
   const DIFF_THROTTLE_MS = 2000 // Max 1 fetch per 2 seconds
 
   // Clear "unseen changes" when chat is opened
+  const markSeen = useSessionStore((s) => s.markSeen)
   useEffect(() => {
-    setUnseenChanges((prev: Set<string>) => {
-      if (prev.has(chatId)) {
-        const next = new Set(prev)
-        next.delete(chatId)
-        return next
-      }
-      return prev
-    })
-  }, [chatId, setUnseenChanges])
+    markSeen(chatId)
+  }, [chatId, markSeen])
 
   // Zen mode: close diff sidebar when entering zen mode
-  const isZenMode = useAtomValue(zenModeAtom)
+  const isZenMode = useUIStore((s) => s.zenMode)
   useEffect(() => {
     if (isZenMode && isDiffSidebarOpen) {
       setIsDiffSidebarOpen(false)
@@ -2360,15 +2331,8 @@ export function ChatView({
   // Clear sub-chat "unseen changes" indicator when sub-chat becomes active
   useEffect(() => {
     if (!activeSubChatId) return
-    setSubChatUnseenChanges((prev: Set<string>) => {
-      if (prev.has(activeSubChatId)) {
-        const next = new Set(prev)
-        next.delete(activeSubChatId)
-        return next
-      }
-      return prev
-    })
-  }, [activeSubChatId, setSubChatUnseenChanges])
+    markSeen(activeSubChatId)
+  }, [activeSubChatId, markSeen])
   const allSubChats = useAgentSubChatStore((state) => state.allSubChats)
 
   // tRPC utils for optimistic cache updates
@@ -2694,7 +2658,7 @@ export function ChatView({
   }, [totalSubChatFileCount, fetchDiffStats])
 
   // Handle Create PR - sends a message to Claude to create the PR
-  const setPendingPrMessage = useSetAtom(pendingPrMessageAtom)
+  const setPendingPrMessage = useUIStore((s) => s.setPendingPrMessage)
 
   const handleCreatePr = useCallback(async () => {
     if (!chatId) {
@@ -2753,7 +2717,7 @@ export function ChatView({
   }, [chatId, setPendingPrMessage])
 
   // Handle Review - sends a message to Claude to review the diff
-  const setPendingReviewMessage = useSetAtom(pendingReviewMessageAtom)
+  const setPendingReviewMessage = useUIStore((s) => s.setPendingReviewMessage)
 
   const handleReview = useCallback(async () => {
     if (!chatId) {
@@ -2923,7 +2887,7 @@ export function ChatView({
         },
         // Clear loading when streaming completes (works even if component unmounted)
         onFinish: () => {
-          clearLoading(setLoadingSubChats, subChatId)
+          useSessionStore.getState().clearLoading(subChatId)
 
           // Check if this was a manual abort (ESC/Ctrl+C) - skip sound if so
           const wasManuallyAborted =
@@ -2933,30 +2897,22 @@ export function ChatView({
           // Get CURRENT values at runtime (not stale closure values)
           const currentActiveSubChatId =
             useAgentSubChatStore.getState().activeSubChatId
-          const currentSelectedChatId = appStore.get(selectedAgentChatIdAtom)
+          const currentSelectedChatId = useSessionStore.getState().workspaceId
 
           const isViewingThisSubChat = currentActiveSubChatId === subChatId
           const isViewingThisChat = currentSelectedChatId === chatId
 
           if (!isViewingThisSubChat) {
-            setSubChatUnseenChanges((prev: Set<string>) => {
-              const next = new Set(prev)
-              next.add(subChatId)
-              return next
-            })
+            useSessionStore.getState().markUnseen(subChatId)
           }
 
           // Also mark parent chat as unseen if user is not viewing it
           if (!isViewingThisChat) {
-            setUnseenChanges((prev: Set<string>) => {
-              const next = new Set(prev)
-              next.add(chatId)
-              return next
-            })
+            useSessionStore.getState().markUnseen(chatId)
 
             // Play completion sound only if NOT manually aborted and sound is enabled
             if (!wasManuallyAborted) {
-              const isSoundEnabled = appStore.get(soundNotificationsEnabledAtom)
+              const isSoundEnabled = useUIStore.getState().preferences.soundNotifications
               if (isSoundEnabled) {
                 try {
                   const audio = new Audio("./sound.mp3")
@@ -2996,9 +2952,6 @@ export function ChatView({
       worktreePath,
       chatId,
       isPlanMode,
-      setSubChatUnseenChanges,
-      selectedChatId,
-      setUnseenChanges,
       notifyAgentComplete,
     ],
   )
@@ -3017,7 +2970,7 @@ export function ChatView({
     const newId = newSubChat.id
 
     // Track this subchat as just created for typewriter effect
-    setJustCreatedIds((prev: Set<string>) => new Set([...prev, newId]))
+    useSessionStore.getState().addJustCreated(newId)
 
     // Add to allSubChats with placeholder name
     store.addToAllSubChats({
@@ -3051,7 +3004,7 @@ export function ChatView({
         transport,
         // Clear loading when streaming completes
         onFinish: () => {
-          clearLoading(setLoadingSubChats, newId)
+          useSessionStore.getState().clearLoading(newId)
 
           // Check if this was a manual abort (ESC/Ctrl+C) - skip sound if so
           const wasManuallyAborted = agentChatStore.wasManuallyAborted(newId)
@@ -3060,30 +3013,22 @@ export function ChatView({
           // Get CURRENT values at runtime (not stale closure values)
           const currentActiveSubChatId =
             useAgentSubChatStore.getState().activeSubChatId
-          const currentSelectedChatId = appStore.get(selectedAgentChatIdAtom)
+          const currentSelectedChatId = useSessionStore.getState().workspaceId
 
           const isViewingThisSubChat = currentActiveSubChatId === newId
           const isViewingThisChat = currentSelectedChatId === chatId
 
           if (!isViewingThisSubChat) {
-            setSubChatUnseenChanges((prev: Set<string>) => {
-              const next = new Set(prev)
-              next.add(newId)
-              return next
-            })
+            useSessionStore.getState().markUnseen(newId)
           }
 
           // Also mark parent chat as unseen if user is not viewing it
           if (!isViewingThisChat) {
-            setUnseenChanges((prev: Set<string>) => {
-              const next = new Set(prev)
-              next.add(chatId)
-              return next
-            })
+            useSessionStore.getState().markUnseen(chatId)
 
             // Play completion sound only if NOT manually aborted and sound is enabled
             if (!wasManuallyAborted) {
-              const isSoundEnabled = appStore.get(soundNotificationsEnabledAtom)
+              const isSoundEnabled = useUIStore.getState().preferences.soundNotifications
               if (isSoundEnabled) {
                 try {
                   const audio = new Audio("./sound.mp3")
@@ -3150,25 +3095,26 @@ export function ChatView({
   }, [handleCreateNewSubChat])
 
   // Multi-select state for sub-chats (for Cmd+W bulk close)
-  const selectedSubChatIds = useAtomValue(selectedSubChatIdsAtom)
-  const isSubChatMultiSelectMode = useAtomValue(isSubChatMultiSelectModeAtom)
-  const clearSubChatSelection = useSetAtom(clearSubChatSelectionAtom)
+  // Not implemented in desktop - use constant placeholders
+  const selectedSubChatIds = EMPTY_SET
+  const isSubChatMultiSelectMode = MULTI_SELECT_MODE_DISABLED
+  const clearSubChatSelection = () => {} // no-op
 
   // Helper to add sub-chat to undo stack
   const addSubChatToUndoStack = useCallback((subChatId: string) => {
     const timeoutId = setTimeout(() => {
-      setUndoStack((prev) => prev.filter(
-        (item) => !(item.type === "subchat" && item.subChatId === subChatId)
+      setUndoStackLocal((prev: UndoItem[]) => prev.filter(
+        (item: UndoItem) => !(item.type === "subchat" && item.subChatId === subChatId)
       ))
     }, 10000)
 
-    setUndoStack((prev) => [...prev, {
+    setUndoStackLocal((prev: UndoItem[]) => [...prev, {
       type: "subchat",
       subChatId,
       chatId,
       timeoutId,
     }])
-  }, [chatId, setUndoStack])
+  }, [chatId])
 
   // Keyboard shortcut: Close active sub-chat (or bulk close if multi-select mode)
   // Web: Opt+Cmd+W (browser uses Cmd+W to close tab)
@@ -3772,7 +3718,8 @@ export function ChatView({
           <ResizableSidebar
             isOpen={isDiffSidebarOpen}
             onClose={() => setIsDiffSidebarOpen(false)}
-            widthAtom={agentsDiffSidebarWidthAtom}
+            width={storedDiffSidebarWidth}
+            setWidth={setStoredDiffSidebarWidth}
             minWidth={350}
             side="right"
             animationDuration={0}
@@ -4105,7 +4052,8 @@ export function ChatView({
           <ResizableSidebar
             isOpen={isPreviewSidebarOpen}
             onClose={() => setIsPreviewSidebarOpen(false)}
-            widthAtom={agentsPreviewSidebarWidthAtom}
+            width={storedPreviewSidebarWidth}
+            setWidth={setStoredPreviewSidebarWidth}
             minWidth={350}
             side="right"
             animationDuration={0}

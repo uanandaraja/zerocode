@@ -17,17 +17,10 @@ import {
   useCallback,
   type ReactNode,
 } from "react"
-import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { useTheme } from "next-themes"
 import type { ITheme } from "xterm"
 
-import {
-  selectedFullThemeIdAtom,
-  fullThemeDataAtom,
-  systemLightThemeIdAtom,
-  systemDarkThemeIdAtom,
-  type VSCodeFullTheme,
-} from "../atoms"
+import { useUIStore, type VSCodeFullTheme } from "../../stores"
 import {
   generateCSSVariables,
   applyCSSVariables,
@@ -140,11 +133,13 @@ interface VSCodeThemeProviderProps {
 export function VSCodeThemeProvider({ children }: VSCodeThemeProviderProps) {
   const { resolvedTheme, setTheme: setNextTheme } = useTheme()
   
-  // Atoms
-  const [selectedThemeId, setSelectedThemeId] = useAtom(selectedFullThemeIdAtom)
-  const [fullThemeData, setFullThemeData] = useAtom(fullThemeDataAtom)
-  const systemLightThemeId = useAtomValue(systemLightThemeIdAtom)
-  const systemDarkThemeId = useAtomValue(systemDarkThemeIdAtom)
+  // Zustand store
+  const selectedThemeId = useUIStore((state) => state.theme.selectedId)
+  const setThemeSelectedId = useUIStore((state) => state.setTheme)
+  const fullThemeData = useUIStore((state) => state.fullThemeData)
+  const setFullThemeData = useUIStore((state) => state.setFullThemeData)
+  const systemLightThemeId = useUIStore((state) => state.theme.lightThemeId)
+  const systemDarkThemeId = useUIStore((state) => state.theme.darkThemeId)
   
   // Use builtin themes only
   const allThemes = BUILTIN_THEMES
@@ -235,8 +230,8 @@ export function VSCodeThemeProvider({ children }: VSCodeThemeProviderProps) {
   
   // Theme actions
   const setThemeById = useCallback((id: string | null) => {
-    setSelectedThemeId(id)
-  }, [setSelectedThemeId])
+    setThemeSelectedId("selectedId", id)
+  }, [setThemeSelectedId])
   
   const contextValue = useMemo((): ThemeContextValue => ({
     currentTheme: fullThemeData,

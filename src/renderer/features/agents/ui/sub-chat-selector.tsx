@@ -1,13 +1,7 @@
 "use client"
 
 import { useCallback, useMemo, useEffect, useRef, useState, memo } from "react"
-import { useAtom, useAtomValue, useSetAtom } from "jotai"
-import {
-  loadingSubChatsAtom,
-  agentsSubChatUnseenChangesAtom,
-  agentsSubChatsSidebarModeAtom,
-  pendingUserQuestionsAtom,
-} from "../atoms"
+import { useUIStore, useSessionStore } from "../../../stores"
 import { trpc } from "../../../lib/trpc"
 import { X, Plus, AlignJustify, Play } from "lucide-react"
 import {
@@ -59,7 +53,7 @@ interface SearchHistoryPopoverProps {
   sortedSubChats: SubChatMeta[]
   loadingSubChats: Map<string, string>
   subChatUnseenChanges: Set<string>
-  pendingQuestions: { subChatId: string } | null
+  pendingQuestions: { sessionId: string } | null
   pendingPlanApprovals: Set<string>
   allSubChatsLength: number
   onSelect: (subChat: SubChatMeta) => void
@@ -88,7 +82,7 @@ const SearchHistoryPopover = memo(function SearchHistoryPopover({
     const isLoading = loadingSubChats.has(subChat.id)
     const hasUnseen = subChatUnseenChanges.has(subChat.id)
     const mode = subChat.mode || "agent"
-    const hasPendingQuestion = pendingQuestions?.subChatId === subChat.id
+    const hasPendingQuestion = pendingQuestions?.sessionId === subChat.id
     const hasPendingPlan = pendingPlanApprovals.has(subChat.id)
 
     return (
@@ -190,13 +184,13 @@ export function SubChatSelector({
       togglePinSubChat: state.togglePinSubChat,
     }))
   )
-  const [loadingSubChats] = useAtom(loadingSubChatsAtom)
-  const subChatUnseenChanges = useAtomValue(agentsSubChatUnseenChangesAtom)
-  const setSubChatUnseenChanges = useSetAtom(agentsSubChatUnseenChangesAtom)
-  const [subChatsSidebarMode, setSubChatsSidebarMode] = useAtom(
-    agentsSubChatsSidebarModeAtom,
-  )
-  const pendingQuestions = useAtomValue(pendingUserQuestionsAtom)
+  // Zustand stores
+  const loadingSubChats = useSessionStore((s) => s.loadingSessions)
+  const subChatUnseenChanges = useSessionStore((s) => s.unseenChanges)
+  const markSeen = useSessionStore((s) => s.markSeen)
+  const subChatsSidebarMode = useUIStore((s) => s.sessionsSidebarMode)
+  const setSubChatsSidebarMode = useUIStore((s) => s.setSessionsSidebarMode)
+  const pendingQuestions = useSessionStore((s) => s.pendingQuestions)
 
   // Pending plan approvals from DB - only for open sub-chats
   const { data: pendingPlanApprovalsData } = trpc.chats.getPendingPlanApprovals.useQuery(
@@ -255,16 +249,9 @@ export function SubChatSelector({
       store.setActiveSubChat(subChatId)
 
       // Clear unseen indicator for this sub-chat
-      setSubChatUnseenChanges((prev: Set<string>) => {
-        if (prev.has(subChatId)) {
-          const next = new Set(prev)
-          next.delete(subChatId)
-          return next
-        }
-        return prev
-      })
+      markSeen(subChatId)
     },
-    [setSubChatUnseenChanges],
+    [markSeen],
   )
 
   const onSwitchFromHistory = useCallback((subChatId: string) => {
@@ -629,7 +616,7 @@ export function SubChatSelector({
                 // Get mode from sub-chat itself (defaults to "agent")
                 const mode = subChat.mode || "agent"
                 // Check if this chat is waiting for user answer
-                const hasPendingQuestion = pendingQuestions?.subChatId === subChat.id
+                const hasPendingQuestion = pendingQuestions?.sessionId === subChat.id
                 // Check if this chat has a pending plan approval
                 const hasPendingPlan = pendingPlanApprovals.has(subChat.id)
 

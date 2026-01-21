@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, useRef } from "react"
-import { useAtom } from "jotai"
+import { useState, useMemo, useEffect } from "react"
 import { ChevronDown } from "lucide-react"
 
 import {
@@ -20,7 +19,7 @@ import {
 import { CheckIcon, ClaudeCodeIcon } from "../../../components/ui/icons"
 import { cn } from "../../../lib/utils"
 import { trpc } from "../../../lib/trpc"
-import { selectedProviderAtom, selectedModelAtom } from "../atoms"
+import { useUIStore } from "../../../stores"
 
 // Model display helper
 function getModelDisplayName(modelId: string): string {
@@ -47,8 +46,14 @@ export function ModelSelector({
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
-  const [selectedProvider, setSelectedProvider] = useAtom(selectedProviderAtom)
-  const [selectedModel, setSelectedModel] = useAtom(selectedModelAtom)
+  
+  // Zustand store for provider/model selection
+  const selectedProvider = useUIStore((s) => s.preferences.selectedProvider)
+  const selectedModel = useUIStore((s) => s.preferences.selectedModel)
+  const setPreference = useUIStore((s) => s.setPreference)
+  
+  const setSelectedProvider = (provider: string) => setPreference("selectedProvider", provider)
+  const setSelectedModel = (model: string) => setPreference("selectedModel", model)
   
   // Fetch providers from OpenCode
   const { data: providersData } = trpc.opencode.providers.useQuery()

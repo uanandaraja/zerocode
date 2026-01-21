@@ -1,7 +1,6 @@
 "use client"
 
 import { memo, useState, useMemo, useCallback } from "react"
-import { useSetAtom, useAtom } from "jotai"
 import { useTheme } from "next-themes"
 import { PatchDiff } from "@pierre/diffs/react"
 import { createPatch } from "diff"
@@ -21,8 +20,8 @@ import { getToolStatus } from "./agent-tool-registry"
 import { AgentToolInterrupted } from "./agent-tool-interrupted"
 import { areToolPropsEqual } from "./agent-tool-utils"
 import { getFileIconByExtension } from "../mentions/agents-file-mention"
-import { agentsDiffSidebarOpenAtom, agentsFocusedDiffFileAtom } from "../atoms"
-import { diffViewModeAtom, DiffModeEnum } from "./agent-diff-view"
+import { useUIStore } from "../../../stores"
+import { DiffModeEnum } from "./agent-diff-view"
 import { cn } from "../../../lib/utils"
 import { useShikiTheme } from "../../../lib/themes/theme-provider"
 
@@ -72,12 +71,18 @@ export const AgentEditTool = memo(function AgentEditTool({
   const isLight = resolvedTheme !== "dark"
   // Use the same theme as the diff sidebar (from user preferences)
   const shikiTheme = useShikiTheme()
-  // Use global diff mode preference (split/unified)
-  const [diffMode, setDiffMode] = useAtom(diffViewModeAtom)
+  // Use local state with localStorage persistence for diff view mode
+  const [diffMode, setDiffMode] = useState<DiffModeEnum>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("agents-diff:view-mode")
+      if (stored === "split") return DiffModeEnum.Split
+    }
+    return DiffModeEnum.Unified
+  })
 
-  // Atoms for opening diff sidebar and focusing on file
-  const setDiffSidebarOpen = useSetAtom(agentsDiffSidebarOpenAtom)
-  const setFocusedDiffFile = useSetAtom(agentsFocusedDiffFileAtom)
+  // Use UI store for opening diff sidebar and focusing on file
+  const setDiffSidebarOpen = useUIStore((state) => state.setDiffSidebarOpen)
+  const setFocusedDiffFile = useUIStore((state) => state.setFocusedDiffFile)
 
   // Determine mode: Write (create new file) vs Edit (modify existing)
   const isWriteMode = part.type === "tool-Write"

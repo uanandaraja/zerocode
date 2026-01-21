@@ -1,16 +1,9 @@
 import { useTheme } from "next-themes"
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { IconSpinner } from "../../../icons"
-import { useAtom, useSetAtom } from "jotai"
 import { motion, AnimatePresence } from "motion/react"
 import { cn } from "../../../lib/utils"
-import {
-  selectedFullThemeIdAtom,
-  fullThemeDataAtom,
-  systemLightThemeIdAtom,
-  systemDarkThemeIdAtom,
-  type VSCodeFullTheme,
-} from "../../../lib/atoms"
+import { useUIStore, type VSCodeFullTheme } from "../../../stores"
 import {
   BUILTIN_THEMES,
   getBuiltinThemeById,
@@ -125,15 +118,16 @@ export function AgentsAppearanceTab() {
   const [mounted, setMounted] = useState(false)
   const isNarrowScreen = useIsNarrowScreen()
 
-  // Theme atoms
-  const [selectedThemeId, setSelectedThemeId] = useAtom(selectedFullThemeIdAtom)
-  const [systemLightThemeId, setSystemLightThemeId] = useAtom(
-    systemLightThemeIdAtom,
-  )
-  const [systemDarkThemeId, setSystemDarkThemeId] = useAtom(
-    systemDarkThemeIdAtom,
-  )
-  const setFullThemeData = useSetAtom(fullThemeDataAtom)
+  // Theme from store
+  const selectedThemeId = useUIStore((state) => state.theme.selectedId)
+  const systemLightThemeId = useUIStore((state) => state.theme.lightThemeId)
+  const systemDarkThemeId = useUIStore((state) => state.theme.darkThemeId)
+  const setTheme = useUIStore((state) => state.setTheme)
+  const setFullThemeData = useUIStore((state) => state.setFullThemeData)
+
+  const setSelectedThemeId = (value: string | null) => setTheme("selectedId", value)
+  const setSystemLightThemeId = (value: string) => setTheme("lightThemeId", value)
+  const setSystemDarkThemeId = (value: string) => setTheme("darkThemeId", value)
 
   useEffect(() => {
     setMounted(true)

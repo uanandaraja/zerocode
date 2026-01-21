@@ -1,10 +1,9 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback, memo } from "react"
-import { useAtomValue } from "jotai"
 import { cn } from "../../../lib/utils"
 import { TypewriterText } from "../../../components/ui/typewriter-text"
-import { justCreatedIdsAtom } from "../atoms"
+import { useSessionStore } from "../../../stores"
 
 interface ChatTitleEditorProps {
   name: string
@@ -45,7 +44,7 @@ export const ChatTitleEditor = memo(function ChatTitleEditor({
   const [isSaving, setIsSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const justCreatedIds = useAtomValue(justCreatedIdsAtom)
+  const justCreatedIds = useSessionStore((s) => s.justCreatedIds)
 
   // Sync editValue when name changes externally
   useEffect(() => {

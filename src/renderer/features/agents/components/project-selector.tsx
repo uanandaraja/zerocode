@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react"
-import { useAtom } from "jotai"
 import { FolderOpen } from "lucide-react"
 import {
   Popover,
@@ -16,7 +15,7 @@ import {
 } from "../../../components/ui/command"
 import { IconChevronDown, CheckIcon, FolderPlusIcon } from "../../../components/ui/icons"
 import { trpc } from "../../../lib/trpc"
-import { selectedProjectAtom } from "../atoms"
+import { useUIStore } from "../../../stores"
 
 // Helper component to render project icon (avatar or folder)
 function ProjectIcon({
@@ -45,7 +44,8 @@ function ProjectIcon({
 }
 
 export function ProjectSelector() {
-  const [selectedProject, setSelectedProject] = useAtom(selectedProjectAtom)
+  const selectedProject = useUIStore((s) => s.selectedProject)
+  const setSelectedProject = useUIStore((s) => s.setSelectedProject)
   const [open, setOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 

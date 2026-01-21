@@ -5,7 +5,7 @@
  * Each theme has been curated to work well with the app's design system.
  */
 
-import type { VSCodeFullTheme } from "../atoms"
+import type { VSCodeFullTheme } from "../../stores"
 import { CURSOR_DARK, CURSOR_LIGHT, CURSOR_MIDNIGHT } from "./cursor-themes"
 
 /**

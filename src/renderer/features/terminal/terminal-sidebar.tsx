@@ -1,7 +1,6 @@
 import { useEffect, useCallback, useMemo, useRef, useState } from "react"
-import { useAtom, useAtomValue } from "jotai"
 import { useTheme } from "next-themes"
-import { fullThemeDataAtom } from "@/lib/atoms"
+import { useUIStore, type TerminalInstance } from "../../stores"
 import { motion } from "motion/react"
 import { ResizableSidebar } from "@/components/ui/resizable-sidebar"
 import { Button } from "@/components/ui/button"
@@ -19,15 +18,7 @@ import { Kbd } from "@/components/ui/kbd"
 import { Terminal } from "./terminal"
 import { TerminalTabs } from "./terminal-tabs"
 import { getDefaultTerminalBg } from "./helpers"
-import {
-  terminalSidebarOpenAtom,
-  terminalSidebarWidthAtom,
-  terminalsAtom,
-  activeTerminalIdAtom,
-  terminalCwdAtom,
-} from "./atoms"
 import { trpc } from "@/lib/trpc"
-import type { TerminalInstance } from "./types"
 
 // Animation constants - keep in sync with ResizableSidebar animationDuration
 const SIDEBAR_ANIMATION_DURATION_SECONDS = 0 // Disabled for performance
@@ -86,15 +77,22 @@ export function TerminalSidebar({
   isMobileFullscreen = false,
   onClose,
 }: TerminalSidebarProps) {
-  const [isOpen, setIsOpen] = useAtom(terminalSidebarOpenAtom)
-  const [allTerminals, setAllTerminals] = useAtom(terminalsAtom)
-  const [allActiveIds, setAllActiveIds] = useAtom(activeTerminalIdAtom)
-  const terminalCwds = useAtomValue(terminalCwdAtom)
+  const isOpen = useUIStore((s) => s.terminalSidebar.open)
+  const setIsOpen = useUIStore((s) => s.setTerminalSidebarOpen)
+  const terminalSidebarWidth = useUIStore((s) => s.terminalSidebar.width)
+  const setTerminalSidebarWidth = useUIStore((s) => s.setTerminalSidebarWidth)
+  const allTerminals = useUIStore((s) => s.terminals)
+  const allActiveIds = useUIStore((s) => s.activeTerminalIds)
+  const terminalCwds = useUIStore((s) => s.terminalCwds)
+  const addTerminal = useUIStore((s) => s.addTerminal)
+  const setTerminals = useUIStore((s) => s.setTerminals)
+  const updateTerminal = useUIStore((s) => s.updateTerminal)
+  const setActiveTerminalId = useUIStore((s) => s.setActiveTerminalId)
 
   // Theme detection for terminal background
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
-  const fullThemeData = useAtomValue(fullThemeDataAtom)
+  const fullThemeData = useUIStore((s) => s.fullThemeData)
 
   const terminalBg = useMemo(() => {
     // Use VS Code theme terminal background if available
@@ -152,28 +150,19 @@ export function TerminalSidebar({
       createdAt: Date.now(),
     }
 
-    setAllTerminals((prev) => ({
-      ...prev,
-      [currentChatId]: [...(prev[currentChatId] || []), newTerminal],
-    }))
+    addTerminal(currentChatId, newTerminal)
 
     // Set as active
-    setAllActiveIds((prev) => ({
-      ...prev,
-      [currentChatId]: id,
-    }))
-  }, [setAllTerminals, setAllActiveIds])
+    setActiveTerminalId(currentChatId, id)
+  }, [addTerminal, setActiveTerminalId])
 
   // Select a terminal - stable callback
   const selectTerminal = useCallback(
     (id: string) => {
       const currentChatId = chatIdRef.current
-      setAllActiveIds((prev) => ({
-        ...prev,
-        [currentChatId]: id,
-      }))
+      setActiveTerminalId(currentChatId, id)
     },
-    [setAllActiveIds],
+    [setActiveTerminalId],
   )
 
   // Close a terminal - stable callback
@@ -191,35 +180,24 @@ export function TerminalSidebar({
 
       // Remove from state
       const newTerminals = currentTerminals.filter((t) => t.id !== id)
-      setAllTerminals((prev) => ({
-        ...prev,
-        [currentChatId]: newTerminals,
-      }))
+      setTerminals(currentChatId, newTerminals)
 
       // If we closed the active terminal, switch to another
       if (currentActiveId === id) {
         const newActive = newTerminals[newTerminals.length - 1]?.id || null
-        setAllActiveIds((prev) => ({
-          ...prev,
-          [currentChatId]: newActive,
-        }))
+        setActiveTerminalId(currentChatId, newActive)
       }
     },
-    [setAllTerminals, setAllActiveIds, killMutation],
+    [setTerminals, setActiveTerminalId, killMutation],
   )
 
   // Rename a terminal - stable callback
   const renameTerminal = useCallback(
     (id: string, name: string) => {
       const currentChatId = chatIdRef.current
-      setAllTerminals((prev) => ({
-        ...prev,
-        [currentChatId]: (prev[currentChatId] || []).map((t) =>
-          t.id === id ? { ...t, name } : t,
-        ),
-      }))
+      updateTerminal(currentChatId, id, { name })
     },
-    [setAllTerminals],
+    [updateTerminal],
   )
 
   // Close other terminals - stable callback
@@ -237,18 +215,12 @@ export function TerminalSidebar({
 
       // Keep only the terminal with the given id
       const remainingTerminal = currentTerminals.find((t) => t.id === id)
-      setAllTerminals((prev) => ({
-        ...prev,
-        [currentChatId]: remainingTerminal ? [remainingTerminal] : [],
-      }))
+      setTerminals(currentChatId, remainingTerminal ? [remainingTerminal] : [])
 
       // Set the remaining terminal as active
-      setAllActiveIds((prev) => ({
-        ...prev,
-        [currentChatId]: id,
-      }))
+      setActiveTerminalId(currentChatId, id)
     },
-    [setAllTerminals, setAllActiveIds, killMutation],
+    [setTerminals, setActiveTerminalId, killMutation],
   )
 
   // Close terminals to the right - stable callback
@@ -268,10 +240,7 @@ export function TerminalSidebar({
 
       // Keep only terminals up to and including the one with the given id
       const remainingTerminals = currentTerminals.slice(0, index + 1)
-      setAllTerminals((prev) => ({
-        ...prev,
-        [currentChatId]: remainingTerminals,
-      }))
+      setTerminals(currentChatId, remainingTerminals)
 
       // If active terminal was closed, switch to the last remaining one
       const currentActiveId = activeTerminalIdRef.current
@@ -279,14 +248,13 @@ export function TerminalSidebar({
         currentActiveId &&
         !remainingTerminals.find((t) => t.id === currentActiveId)
       ) {
-        setAllActiveIds((prev) => ({
-          ...prev,
-          [currentChatId]:
-            remainingTerminals[remainingTerminals.length - 1]?.id || null,
-        }))
+        setActiveTerminalId(
+          currentChatId,
+          remainingTerminals[remainingTerminals.length - 1]?.id || null
+        )
       }
     },
-    [setAllTerminals, setAllActiveIds, killMutation],
+    [setTerminals, setActiveTerminalId, killMutation],
   )
 
   // Close sidebar callback - stable
@@ -333,7 +301,7 @@ export function TerminalSidebar({
       ) {
         e.preventDefault()
         e.stopPropagation()
-        setIsOpen((prev) => !prev)
+        setIsOpen(!useUIStore.getState().terminalSidebar.open)
       }
     }
 
@@ -433,7 +401,8 @@ export function TerminalSidebar({
     <ResizableSidebar
       isOpen={isOpen}
       onClose={closeSidebar}
-      widthAtom={terminalSidebarWidthAtom}
+      width={terminalSidebarWidth}
+      setWidth={setTerminalSidebarWidth}
       side="right"
       minWidth={300}
       maxWidth={800}

@@ -64,6 +64,34 @@ export interface VSCodeFullTheme {
   path?: string
 }
 
+export type AgentsMobileViewMode = "chats" | "chat" | "preview" | "diff" | "terminal"
+
+/**
+ * Represents a terminal instance in the multi-terminal system.
+ * Each chat can have multiple terminal instances.
+ */
+export interface TerminalInstance {
+  /** Unique terminal id (nanoid) */
+  id: string
+  /** Full paneId for TerminalManager: `${chatId}:term:${id}` */
+  paneId: string
+  /** Display name: "Terminal 1", "Terminal 2", etc. */
+  name: string
+  /** Creation timestamp */
+  createdAt: number
+}
+
+export interface AgentsDebugMode {
+  enabled: boolean
+  simulateNoTeams: boolean
+  simulateNoRepos: boolean
+  simulateNoReadyRepos: boolean
+  resetOnboarding: boolean
+  bypassConnections: boolean
+  forceStep: "workspace" | "profile" | "claude-code" | "github" | "discord" | null
+  simulateCompleted: boolean
+}
+
 // ============================================
 // STORE INTERFACE
 // ============================================
@@ -146,6 +174,56 @@ interface UIState {
   } | null
 
   // ═══════════════════════════════════════════
+  // AGENT MODE (persisted)
+  // ═══════════════════════════════════════════
+  isPlanMode: boolean
+  lastSelectedModelId: string
+  lastSelectedAgentId: string
+  lastSelectedBranches: Record<string, string> // projectId -> branchName
+
+  // ═══════════════════════════════════════════
+  // MOBILE VIEW (transient)
+  // ═══════════════════════════════════════════
+  mobileViewMode: AgentsMobileViewMode
+
+  // ═══════════════════════════════════════════
+  // ARCHIVE (transient)
+  // ═══════════════════════════════════════════
+  archivePopoverOpen: boolean
+  archiveSearchQuery: string
+  archiveRepositoryFilter: string | null
+
+  // ═══════════════════════════════════════════
+  // MULTI-SELECT (transient)
+  // ═══════════════════════════════════════════
+  selectedWorkspaceIds: Set<string>
+  selectedSessionIds: Set<string>
+
+  // ═══════════════════════════════════════════
+  // DEBUG MODE (persisted)
+  // ═══════════════════════════════════════════
+  debugMode: AgentsDebugMode
+
+  // ═══════════════════════════════════════════
+  // MISC TRANSIENT STATE
+  // ═══════════════════════════════════════════
+  selectedTeamId: string | null
+  focusedDiffFile: string | null
+  filteredDiffFiles: string[] | null
+  pendingPrMessage: string | null
+  pendingReviewMessage: string | null
+
+  // ═══════════════════════════════════════════
+  // TERMINAL STATE (persisted)
+  // ═══════════════════════════════════════════
+  /** Map of chatId -> terminal instances */
+  terminals: Record<string, TerminalInstance[]>
+  /** Map of chatId -> active terminal id */
+  activeTerminalIds: Record<string, string | null>
+  /** Map of paneId -> current working directory */
+  terminalCwds: Record<string, string>
+
+  // ═══════════════════════════════════════════
   // ACTIONS
   // ═══════════════════════════════════════════
 
@@ -194,6 +272,46 @@ interface UIState {
 
   // Project actions
   setSelectedProject: (project: UIState["selectedProject"]) => void
+
+  // Agent mode actions
+  setIsPlanMode: (isPlanMode: boolean) => void
+  setLastSelectedModelId: (modelId: string) => void
+  setLastSelectedAgentId: (agentId: string) => void
+  setLastSelectedBranch: (projectId: string, branch: string) => void
+
+  // Mobile view actions
+  setMobileViewMode: (mode: AgentsMobileViewMode) => void
+
+  // Archive actions
+  setArchivePopoverOpen: (open: boolean) => void
+  setArchiveSearchQuery: (query: string) => void
+  setArchiveRepositoryFilter: (filter: string | null) => void
+
+  // Multi-select actions
+  toggleWorkspaceSelection: (workspaceId: string) => void
+  selectAllWorkspaces: (workspaceIds: string[]) => void
+  clearWorkspaceSelection: () => void
+  toggleSessionSelection: (sessionId: string) => void
+  selectAllSessions: (sessionIds: string[]) => void
+  clearSessionSelection: () => void
+
+  // Debug mode actions
+  setDebugMode: (mode: Partial<AgentsDebugMode>) => void
+
+  // Misc actions
+  setSelectedTeamId: (teamId: string | null) => void
+  setFocusedDiffFile: (path: string | null) => void
+  setFilteredDiffFiles: (files: string[] | null) => void
+  setPendingPrMessage: (message: string | null) => void
+  setPendingReviewMessage: (message: string | null) => void
+
+  // Terminal actions
+  setTerminals: (chatId: string, terminals: TerminalInstance[]) => void
+  addTerminal: (chatId: string, terminal: TerminalInstance) => void
+  removeTerminal: (chatId: string, terminalId: string) => void
+  updateTerminal: (chatId: string, terminalId: string, updates: Partial<TerminalInstance>) => void
+  setActiveTerminalId: (chatId: string, terminalId: string | null) => void
+  setTerminalCwd: (paneId: string, cwd: string) => void
 }
 
 // ============================================
@@ -253,6 +371,48 @@ export const useUIStore = create<UIState>()(
       sessionInfo: null,
 
       selectedProject: null,
+
+      // Agent mode
+      isPlanMode: false,
+      lastSelectedModelId: "sonnet",
+      lastSelectedAgentId: "claude-code",
+      lastSelectedBranches: {},
+
+      // Mobile view
+      mobileViewMode: "chat" as AgentsMobileViewMode,
+
+      // Archive
+      archivePopoverOpen: false,
+      archiveSearchQuery: "",
+      archiveRepositoryFilter: null,
+
+      // Multi-select
+      selectedWorkspaceIds: new Set<string>(),
+      selectedSessionIds: new Set<string>(),
+
+      // Debug mode
+      debugMode: {
+        enabled: false,
+        simulateNoTeams: false,
+        simulateNoRepos: false,
+        simulateNoReadyRepos: false,
+        resetOnboarding: false,
+        bypassConnections: false,
+        forceStep: null,
+        simulateCompleted: false,
+      },
+
+      // Misc
+      selectedTeamId: null,
+      focusedDiffFile: null,
+      filteredDiffFiles: null,
+      pendingPrMessage: null,
+      pendingReviewMessage: null,
+
+      // Terminal state
+      terminals: {},
+      activeTerminalIds: {},
+      terminalCwds: {},
 
       // ═══════════════════════════════════════════
       // ACTIONS
@@ -380,10 +540,119 @@ export const useUIStore = create<UIState>()(
 
       // Project actions
       setSelectedProject: (project) => set({ selectedProject: project }),
+
+      // Agent mode actions
+      setIsPlanMode: (isPlanMode) => set({ isPlanMode }),
+      setLastSelectedModelId: (modelId) => set({ lastSelectedModelId: modelId }),
+      setLastSelectedAgentId: (agentId) => set({ lastSelectedAgentId: agentId }),
+      setLastSelectedBranch: (projectId, branch) =>
+        set((state) => ({
+          lastSelectedBranches: { ...state.lastSelectedBranches, [projectId]: branch },
+        })),
+
+      // Mobile view actions
+      setMobileViewMode: (mode) => set({ mobileViewMode: mode }),
+
+      // Archive actions
+      setArchivePopoverOpen: (open) => set({ archivePopoverOpen: open }),
+      setArchiveSearchQuery: (query) => set({ archiveSearchQuery: query }),
+      setArchiveRepositoryFilter: (filter) => set({ archiveRepositoryFilter: filter }),
+
+      // Multi-select actions
+      toggleWorkspaceSelection: (workspaceId) =>
+        set((state) => {
+          const next = new Set(state.selectedWorkspaceIds)
+          if (next.has(workspaceId)) {
+            next.delete(workspaceId)
+          } else {
+            next.add(workspaceId)
+          }
+          return { selectedWorkspaceIds: next }
+        }),
+
+      selectAllWorkspaces: (workspaceIds) =>
+        set({ selectedWorkspaceIds: new Set(workspaceIds) }),
+
+      clearWorkspaceSelection: () =>
+        set({ selectedWorkspaceIds: new Set() }),
+
+      toggleSessionSelection: (sessionId) =>
+        set((state) => {
+          const next = new Set(state.selectedSessionIds)
+          if (next.has(sessionId)) {
+            next.delete(sessionId)
+          } else {
+            next.add(sessionId)
+          }
+          return { selectedSessionIds: next }
+        }),
+
+      selectAllSessions: (sessionIds) =>
+        set({ selectedSessionIds: new Set(sessionIds) }),
+
+      clearSessionSelection: () =>
+        set({ selectedSessionIds: new Set() }),
+
+      // Debug mode actions
+      setDebugMode: (mode) =>
+        set((state) => ({
+          debugMode: { ...state.debugMode, ...mode },
+        })),
+
+      // Misc actions
+      setSelectedTeamId: (teamId) => set({ selectedTeamId: teamId }),
+      setFocusedDiffFile: (path) => set({ focusedDiffFile: path }),
+      setFilteredDiffFiles: (files) => set({ filteredDiffFiles: files }),
+      setPendingPrMessage: (message) => set({ pendingPrMessage: message }),
+      setPendingReviewMessage: (message) => set({ pendingReviewMessage: message }),
+
+      // Terminal actions
+      setTerminals: (chatId, terminals) =>
+        set((state) => ({
+          terminals: { ...state.terminals, [chatId]: terminals },
+        })),
+
+      addTerminal: (chatId, terminal) =>
+        set((state) => ({
+          terminals: {
+            ...state.terminals,
+            [chatId]: [...(state.terminals[chatId] || []), terminal],
+          },
+        })),
+
+      removeTerminal: (chatId, terminalId) =>
+        set((state) => ({
+          terminals: {
+            ...state.terminals,
+            [chatId]: (state.terminals[chatId] || []).filter(
+              (t) => t.id !== terminalId
+            ),
+          },
+        })),
+
+      updateTerminal: (chatId, terminalId, updates) =>
+        set((state) => ({
+          terminals: {
+            ...state.terminals,
+            [chatId]: (state.terminals[chatId] || []).map((t) =>
+              t.id === terminalId ? { ...t, ...updates } : t
+            ),
+          },
+        })),
+
+      setActiveTerminalId: (chatId, terminalId) =>
+        set((state) => ({
+          activeTerminalIds: { ...state.activeTerminalIds, [chatId]: terminalId },
+        })),
+
+      setTerminalCwd: (paneId, cwd) =>
+        set((state) => ({
+          terminalCwds: { ...state.terminalCwds, [paneId]: cwd },
+        })),
     }),
     {
       name: "ui-store",
-      version: 1,
+      version: 2,
       partialize: (state) => ({
         // Only persist these fields
         sidebar: state.sidebar,
@@ -395,7 +664,21 @@ export const useUIStore = create<UIState>()(
         preferences: state.preferences,
         theme: state.theme,
         selectedProject: state.selectedProject,
-        // NOT persisted: dialogs, zenMode, updateState, isDesktop, isFullscreen, sessionInfo, fullThemeData, allThemes
+        // Agent mode (persisted)
+        isPlanMode: state.isPlanMode,
+        lastSelectedModelId: state.lastSelectedModelId,
+        lastSelectedAgentId: state.lastSelectedAgentId,
+        lastSelectedBranches: state.lastSelectedBranches,
+        // Debug mode (persisted)
+        debugMode: state.debugMode,
+        // Terminal state (persisted)
+        terminals: state.terminals,
+        activeTerminalIds: state.activeTerminalIds,
+        terminalCwds: state.terminalCwds,
+        // NOT persisted: dialogs, zenMode, updateState, isDesktop, isFullscreen, sessionInfo,
+        // fullThemeData, allThemes, mobileViewMode, archive*, selectedWorkspaceIds,
+        // selectedSessionIds, selectedTeamId, focusedDiffFile, filteredDiffFiles,
+        // pendingPrMessage, pendingReviewMessage
       }),
     }
   )

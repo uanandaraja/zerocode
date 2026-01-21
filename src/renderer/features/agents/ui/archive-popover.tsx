@@ -1,13 +1,9 @@
 "use client"
 
 import React, { useMemo, useRef, useEffect, useState, useCallback, memo } from "react"
-import { useAtom } from "jotai"
 import { trpc } from "../../../lib/trpc"
-import {
-  archivePopoverOpenAtom,
-  archiveSearchQueryAtom,
-  selectedAgentChatIdAtom,
-} from "../atoms"
+import { useUIStore } from "../../../stores"
+import { useOptionalWorkspaceContext } from "../../../contexts/WorkspaceContext"
 import { Input } from "../../../components/ui/input"
 import {
   SearchIcon,
@@ -182,13 +178,28 @@ interface ArchivePopoverProps {
 }
 
 export const ArchivePopover = memo(function ArchivePopover({ trigger }: ArchivePopoverProps) {
-  const [open, setOpen] = useAtom(archivePopoverOpenAtom)
-  const [searchQuery, setSearchQuery] = useAtom(archiveSearchQueryAtom)
+  // Zustand store state
+  const open = useUIStore((s) => s.archivePopoverOpen)
+  const setOpen = useUIStore((s) => s.setArchivePopoverOpen)
+  const searchQuery = useUIStore((s) => s.archiveSearchQuery)
+  const setSearchQuery = useUIStore((s) => s.setArchiveSearchQuery)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const popoverContentRef = useRef<HTMLDivElement>(null)
   const chatItemRefs = useRef<(HTMLDivElement | null)[]>([])
-  const [selectedChatId, setSelectedChatId] = useAtom(selectedAgentChatIdAtom)
+  
+  // Get workspace from URL via context
+  const workspaceContext = useOptionalWorkspaceContext()
+  const selectedChatId = workspaceContext?.workspaceId ?? null
+  
+  // Navigation helper using router context
+  const setSelectedChatId = useCallback((id: string | null) => {
+    if (id) {
+      workspaceContext?.navigateToWorkspace(id)
+    } else {
+      workspaceContext?.navigateToNewWorkspace()
+    }
+  }, [workspaceContext])
 
   // Get utils outside of callbacks - hooks must be called at top level
   const utils = trpc.useUtils()

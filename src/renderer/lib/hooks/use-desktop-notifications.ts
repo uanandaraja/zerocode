@@ -1,15 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useCallback } from "react"
-import { useAtom } from "jotai"
-import { atomWithStorage } from "jotai/utils"
+import { useEffect, useRef, useCallback, useState } from "react"
 import { isDesktopApp } from "../utils/platform"
-
-// Track pending notifications count for badge
-const pendingNotificationsAtom = atomWithStorage<number>(
-  "desktop-pending-notifications",
-  0,
-)
 
 // Track window focus state - initialize from document.hasFocus() if available
 let isWindowFocused =
@@ -22,7 +14,8 @@ let isWindowFocused =
  * - Clears badge when window regains focus
  */
 export function useDesktopNotifications() {
-  const [pendingCount, setPendingCount] = useAtom(pendingNotificationsAtom)
+  // Use local state for pending count - this is transient UI state
+  const [pendingCount, setPendingCount] = useState<number>(0)
   const isInitialized = useRef(false)
 
   // Subscribe to window focus changes

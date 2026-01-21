@@ -5,8 +5,8 @@ import { useIsMobile } from "../../lib/hooks/use-mobile"
 // New Zustand stores
 import { useUIStore, useSessionStore } from "../../stores"
 
-// Legacy Jotai imports - will be removed after full migration
-import { agentsSidebarWidthAtom } from "../../lib/atoms"
+// Context for URL-based navigation
+import { useOptionalWorkspaceContext } from "../../contexts/WorkspaceContext"
 
 import { trpc } from "../../lib/trpc"
 import { useAgentsHotkeys } from "../agents/lib/agents-hotkeys-manager"
@@ -42,6 +42,8 @@ export function AgentsLayout() {
   
   const sidebarOpen = useUIStore((s) => s.sidebar.open)
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen)
+  const sidebarWidth = useUIStore((s) => s.sidebar.width)
+  const setSidebarWidth = useUIStore((s) => s.setSidebarWidth)
   
   const settingsOpen = useUIStore((s) => s.dialogs.settings)
   const setSettingsOpen = (open: boolean) => open 
@@ -60,14 +62,11 @@ export function AgentsLayout() {
   const isZenMode = useUIStore((s) => s.zenMode)
   const setIsZenMode = useUIStore((s) => s.setZenMode)
 
-  // Session store for workspace selection
-  // Note: In the future, selectedChatId will come from URL params via TanStack Router
-  // For now, we'll use a local state that syncs with session store
-  const setWorkspaceId = useSessionStore((s) => s.setWorkspaceId)
-
-  // Local state for selected chat ID (will be replaced by URL params)
-  // TODO: Replace with useParams from TanStack Router
-  const selectedChatId = null as string | null // Placeholder - will come from URL
+  // Get workspace context from router (will be null on index page)
+  const workspaceContext = useOptionalWorkspaceContext()
+  
+  // Selected workspace ID comes from URL via WorkspaceContext
+  const selectedChatId = workspaceContext?.workspaceId ?? null
 
   // Initialize isDesktop on mount
   useEffect(() => {
@@ -169,18 +168,9 @@ export function AgentsLayout() {
   const handleSignOut = useCallback(() => {
     // Clear selected project
     setSelectedProject(null)
-    // Clear workspace in session store
-    setWorkspaceId(null)
-  }, [setSelectedProject, setWorkspaceId])
-
-  // Initialize session store when workspace is selected
-  useEffect(() => {
-    if (selectedChatId) {
-      setWorkspaceId(selectedChatId)
-    } else {
-      setWorkspaceId(null)
-    }
-  }, [selectedChatId, setWorkspaceId])
+    // Navigate to index page (which clears workspace context)
+    workspaceContext?.navigateToNewWorkspace()
+  }, [setSelectedProject, workspaceContext])
 
   // Toggle zen mode: collapse all sidebars for distraction-free focus
   // On exit, open main sidebar only (simple, predictable behavior)
@@ -196,11 +186,14 @@ export function AgentsLayout() {
     }
   }, [isZenMode, setSidebarOpen, setIsZenMode])
 
-  // Placeholder for setSelectedChatId - will be replaced by router navigation
+  // Navigate to workspace via router
   const setSelectedChatId = useCallback((id: string | null) => {
-    // TODO: Use router.navigate() instead
-    console.log("Navigate to workspace:", id)
-  }, [])
+    if (id) {
+      workspaceContext?.navigateToWorkspace(id)
+    } else {
+      workspaceContext?.navigateToNewWorkspace()
+    }
+  }, [workspaceContext])
 
   // Wrapper for setSidebarOpen that handles function updates
   const handleSetSidebarOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
@@ -242,7 +235,8 @@ export function AgentsLayout() {
         <ResizableSidebar
           isOpen={!isMobile && sidebarOpen}
           onClose={handleCloseSidebar}
-          widthAtom={agentsSidebarWidthAtom}
+          width={sidebarWidth}
+          setWidth={setSidebarWidth}
           minWidth={SIDEBAR_MIN_WIDTH}
           maxWidth={SIDEBAR_MAX_WIDTH}
           side="left"

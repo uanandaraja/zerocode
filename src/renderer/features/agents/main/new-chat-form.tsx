@@ -1,7 +1,6 @@
 "use client"
 
 import { useVirtualizer } from "@tanstack/react-virtual"
-import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { AlignJustify, Plus } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
@@ -29,26 +28,10 @@ import {
   PopoverTrigger,
 } from "../../../components/ui/popover"
 import { cn } from "../../../lib/utils"
-import {
-  agentsDebugModeAtom,
-  isPlanModeAtom,
-  justCreatedIdsAtom,
-  lastSelectedAgentIdAtom,
-  lastSelectedBranchesAtom,
-  lastSelectedRepoAtom,
-  lastSelectedWorkModeAtom,
-  selectedAgentChatIdAtom,
-  selectedDraftIdAtom,
-  selectedProjectAtom,
-} from "../atoms"
+import { useUIStore, useSessionStore } from "../../../stores"
+import { useOptionalWorkspaceContext } from "../../../contexts/WorkspaceContext"
 import { ProjectSelector } from "../components/project-selector"
 import { WorkModeSelector } from "../components/work-mode-selector"
-// import { selectedTeamIdAtom } from "@/lib/atoms/team"
-import { atom } from "jotai"
-const selectedTeamIdAtom = atom<string | null>(null)
-// import { agentsSettingsDialogOpenAtom, agentsSettingsDialogActiveTabAtom } from "@/lib/atoms/agents-settings-dialog"
-const agentsSettingsDialogOpenAtom = atom(false)
-const agentsSettingsDialogActiveTabAtom = atom<string | null>(null)
 // Desktop uses real tRPC
 import { toast } from "sonner"
 import { trpc } from "../../../lib/trpc"
@@ -74,7 +57,7 @@ import {
   PromptInputActions,
   PromptInputContextItems,
 } from "../../../components/ui/prompt-input"
-import { agentsSidebarOpenAtom, agentsUnseenChangesAtom } from "../atoms"
+
 import { AgentSendButton } from "../components/agent-send-button"
 import { CreateBranchDialog } from "../components/create-branch-dialog"
 import { ModelSelector } from "../components/model-selector"
@@ -116,19 +99,47 @@ export function NewChatForm({
 }: NewChatFormProps = {}) {
   // UNCONTROLLED: just track if editor has content for send button
   const [hasContent, setHasContent] = useState(false)
-  const [selectedTeamId] = useAtom(selectedTeamIdAtom)
-  const [selectedChatId, setSelectedChatId] = useAtom(selectedAgentChatIdAtom)
-  const [selectedDraftId, setSelectedDraftId] = useAtom(selectedDraftIdAtom)
-  const [sidebarOpen, setSidebarOpen] = useAtom(agentsSidebarOpenAtom)
+  const selectedTeamId = useUIStore((s) => s.selectedTeamId)
+  
+  // Get workspace from URL via context
+  const workspaceContext = useOptionalWorkspaceContext()
+  const selectedChatId = workspaceContext?.workspaceId ?? null
+  
+  // Navigation helper using router context  
+  const setSelectedChatId = useCallback((id: string | null) => {
+    if (id) {
+      workspaceContext?.navigateToWorkspace(id)
+    } else {
+      workspaceContext?.navigateToNewWorkspace()
+    }
+  }, [workspaceContext])
+
+  // Draft ID - keep as local state since it's not in the stores
+  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null)
+  
+  // Sidebar from UI store
+  const sidebarOpen = useUIStore((s) => s.sidebar.open)
+  const setSidebarOpen = useUIStore((s) => s.setSidebarOpen)
 
   // Current draft ID being edited (generated when user starts typing in empty form)
   const currentDraftIdRef = useRef<string | null>(null)
-  const unseenChanges = useAtomValue(agentsUnseenChangesAtom)
+  const unseenChanges = useSessionStore((s) => s.unseenChanges)
 
   // Check if any chat has unseen changes
   const hasAnyUnseenChanges = unseenChanges.size > 0
-  const [lastSelectedRepo, setLastSelectedRepo] = useAtom(lastSelectedRepoAtom)
-  const [selectedProject, setSelectedProject] = useAtom(selectedProjectAtom)
+  
+  // Last selected repo - keep as local state
+  const [lastSelectedRepo, setLastSelectedRepo] = useState<{
+    id: string
+    name: string
+    full_name: string
+    sandbox_status?: string
+    isPublicImport?: boolean
+  } | null>(null)
+  
+  // Selected project from UI store
+  const selectedProject = useUIStore((s) => s.selectedProject)
+  const setSelectedProject = useUIStore((s) => s.setSelectedProject)
 
   // Fetch projects to validate selectedProject exists
   const { data: projectsList, isLoading: isLoadingProjects } =
@@ -152,15 +163,18 @@ export function NewChatForm({
       setSelectedProject(null)
     }
   }, [selectedProject, projectsList, validatedProject, setSelectedProject])
-  const [lastSelectedAgentId, setLastSelectedAgentId] = useAtom(
-    lastSelectedAgentIdAtom,
-  )
-  const [isPlanMode, setIsPlanMode] = useAtom(isPlanModeAtom)
-  const [workMode, setWorkMode] = useAtom(lastSelectedWorkModeAtom)
-  const debugMode = useAtomValue(agentsDebugModeAtom)
-  const setSettingsDialogOpen = useSetAtom(agentsSettingsDialogOpenAtom)
-  const setSettingsActiveTab = useSetAtom(agentsSettingsDialogActiveTabAtom)
-  const setJustCreatedIds = useSetAtom(justCreatedIdsAtom)
+  // Agent mode and preferences from UI store
+  const lastSelectedAgentId = useUIStore((s) => s.lastSelectedAgentId)
+  const setLastSelectedAgentId = useUIStore((s) => s.setLastSelectedAgentId)
+  const isPlanMode = useUIStore((s) => s.isPlanMode)
+  const setIsPlanMode = useUIStore((s) => s.setIsPlanMode)
+  const workMode = useUIStore((s) => s.preferences.workMode)
+  const setWorkMode = useCallback((mode: "local" | "worktree") => {
+    useUIStore.getState().setPreference("workMode", mode)
+  }, [])
+  const debugMode = useUIStore((s) => s.debugMode)
+  const addJustCreated = useSessionStore((s) => s.addJustCreated)
+  
   const [repoSearchQuery, setRepoSearchQuery] = useState("")
   const [createBranchDialogOpen, setCreateBranchDialogOpen] = useState(false)
   // Parse owner/repo from GitHub URL
@@ -174,9 +188,11 @@ export function NewChatForm({
   )
   const [repoPopoverOpen, setRepoPopoverOpen] = useState(false)
   const [branchPopoverOpen, setBranchPopoverOpen] = useState(false)
-  const [lastSelectedBranches, setLastSelectedBranches] = useAtom(
-    lastSelectedBranchesAtom,
-  )
+  
+  // Branch selection from UI store
+  const lastSelectedBranches = useUIStore((s) => s.lastSelectedBranches)
+  const setLastSelectedBranchInStore = useUIStore((s) => s.setLastSelectedBranch)
+  
   const [branchSearch, setBranchSearch] = useState("")
 
   // Get/set selected branch for current project (persisted per project)
@@ -186,13 +202,10 @@ export function NewChatForm({
   const setSelectedBranch = useCallback(
     (branch: string) => {
       if (validatedProject?.id) {
-        setLastSelectedBranches((prev) => ({
-          ...prev,
-          [validatedProject.id]: branch,
-        }))
+        setLastSelectedBranchInStore(validatedProject.id, branch)
       }
     },
-    [validatedProject?.id, setLastSelectedBranches],
+    [validatedProject?.id, setLastSelectedBranchInStore],
   )
   const branchListRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<AgentsMentionsEditorHandle>(null)
@@ -542,11 +555,10 @@ export function NewChatForm({
       utils.chats.list.invalidate()
       setSelectedChatId(data.id)
       // Track this chat and its first subchat as just created for typewriter effect
-      const ids = [data.id]
+      addJustCreated(data.id)
       if (data.subChats?.[0]?.id) {
-        ids.push(data.subChats[0].id)
+        addJustCreated(data.subChats[0].id)
       }
-      setJustCreatedIds((prev: Set<string>) => new Set([...prev, ...ids]))
     },
     onError: (error) => {
       toast.error(error.message)
@@ -937,7 +949,7 @@ export function NewChatForm({
           ) : (
             <AgentsHeaderControls
               isSidebarOpen={sidebarOpen}
-              onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+              onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
               hasUnseenChanges={hasAnyUnseenChanges}
             />
           )}
@@ -1001,7 +1013,7 @@ export function NewChatForm({
                       onCloseSlashTrigger={handleCloseSlashTrigger}
                       onContentChange={handleContentChange}
                       onSubmit={handleSend}
-                      onShiftTab={() => setIsPlanMode((prev) => !prev)}
+                      onShiftTab={() => setIsPlanMode(!isPlanMode)}
                       placeholder="Plan, @ for context, / for commands"
                       className={cn(
                         "bg-transparent max-h-[240px] overflow-y-auto p-1",

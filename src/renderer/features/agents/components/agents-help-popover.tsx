@@ -9,8 +9,7 @@ import {
 } from "../../../components/ui/dropdown-menu"
 import { KeyboardIcon } from "../../../components/ui/icons"
 import { DiscordIcon } from "../../../icons"
-import { useSetAtom } from "jotai"
-import { agentsShortcutsDialogOpenAtom } from "../../../lib/atoms"
+import { useUIStore } from "../../../stores"
 
 interface AgentsHelpPopoverProps {
   children: React.ReactNode
@@ -26,7 +25,7 @@ export function AgentsHelpPopover({
   isMobile = false,
 }: AgentsHelpPopoverProps) {
   const [internalOpen, setInternalOpen] = useState(false)
-  const setShortcutsDialogOpen = useSetAtom(agentsShortcutsDialogOpenAtom)
+  const openDialog = useUIStore((state) => state.openDialog)
 
   // Use controlled state if provided, otherwise use internal state
   const open = controlledOpen ?? internalOpen
@@ -38,7 +37,7 @@ export function AgentsHelpPopover({
 
   const handleKeyboardShortcutsClick = () => {
     setOpen(false)
-    setShortcutsDialogOpen(true)
+    openDialog("shortcuts")
   }
 
   return (

@@ -1,8 +1,7 @@
 "use client"
 
 import { cn } from "../../../lib/utils"
-import { useAtom } from "jotai"
-import { agentsSettingsDialogActiveTabAtom, type SettingsTab } from "../../../lib/atoms"
+import { useUIStore, type SettingsTab } from "../../../stores"
 import { X } from "lucide-react"
 import { AnimatePresence, motion } from "motion/react"
 import { useEffect, useState } from "react"
@@ -83,7 +82,8 @@ export function AgentsSettingsDialog({
   isOpen,
   onClose,
 }: AgentsSettingsDialogProps) {
-  const [activeTab, setActiveTab] = useAtom(agentsSettingsDialogActiveTabAtom)
+  const activeTab = useUIStore((state) => state.dialogs.settingsTab)
+  const setActiveTab = useUIStore((state) => state.setSettingsTab)
   const [mounted, setMounted] = useState(false)
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
 

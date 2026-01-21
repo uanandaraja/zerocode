@@ -7,9 +7,8 @@ import { createPortal } from "react-dom"
 const Image = ({ src, alt, width, height, className }: any) => <img src={src} alt={alt} width={width} height={height} className={className} />
 import { useTheme } from "next-themes"
 import { X } from "lucide-react"
-import { useAtom } from "jotai"
 import { Button } from "../../../components/ui/button"
-import { agentsDebugModeAtom } from "../atoms"
+import { useUIStore } from "../../../stores"
 
 const EASING_CURVE = [0.55, 0.055, 0.675, 0.19] as const
 
@@ -22,7 +21,8 @@ export function AgentsOnboardingDialog() {
   const [isOpen, setIsOpen] = useState(false)
   const openAtRef = useRef<number>(0)
   const { resolvedTheme } = useTheme()
-  const [debugMode, setDebugMode] = useAtom(agentsDebugModeAtom)
+  const debugMode = useUIStore((s) => s.debugMode)
+  const setDebugMode = useUIStore((s) => s.setDebugMode)
 
   useEffect(() => {
     setMounted(true)
@@ -31,7 +31,7 @@ export function AgentsOnboardingDialog() {
     if (debugMode.enabled && debugMode.resetOnboarding) {
       localStorage.removeItem(ONBOARDING_STORAGE_KEY)
       // Reset the flag to prevent infinite loops
-      setDebugMode((prev) => ({ ...prev, resetOnboarding: false }))
+      setDebugMode({ resetOnboarding: false })
     }
 
     // Check localStorage on mount

@@ -3,7 +3,7 @@
  * Actions can be triggered via hotkeys or UI buttons
  */
 
-import type { SettingsTab } from "../../../lib/atoms"
+import type { SettingsTab } from "../../../stores"
 
 // ============================================================================
 // TYPES

@@ -1,7 +1,6 @@
 "use client"
 
 import { memo, useState, useMemo, useEffect, useRef, useCallback } from "react"
-import { useAtom } from "jotai"
 import { TextShimmer } from "../../../components/ui/text-shimmer"
 import {
   IconSpinner,
@@ -17,7 +16,7 @@ import { areToolPropsEqual } from "./agent-tool-utils"
 import { cn } from "../../../lib/utils"
 import { Circle } from "lucide-react"
 import { AgentToolCall } from "./agent-tool-call"
-import { currentTodosAtomFamily } from "../atoms"
+import { useSessionStore } from "../../../stores"
 
 export interface TodoItem {
   content: string
@@ -311,12 +310,14 @@ export const AgentTodoTool = memo(function AgentTodoTool({
   subChatId,
 }: AgentTodoToolProps) {
   // Synced todos state - scoped per subChatId to prevent cross-chat conflicts
-  // Uses a stable key to ensure proper isolation between different sub-chats
-  const todosAtom = useMemo(
-    () => currentTodosAtomFamily(subChatId || "default"),
-    [subChatId],
+  // Uses Zustand store for proper isolation between different sub-chats
+  const sessionId = subChatId || "default"
+  const todoState = useSessionStore((s) => s.todos[sessionId] ?? { todos: [], creationToolCallId: null })
+  const setTodos = useSessionStore((s) => s.setTodos)
+  const setTodoState = useCallback(
+    (state: typeof todoState) => setTodos(sessionId, state),
+    [setTodos, sessionId]
   )
-  const [todoState, setTodoState] = useAtom(todosAtom)
   const syncedTodos = todoState.todos
   const creationToolCallId = todoState.creationToolCallId
 

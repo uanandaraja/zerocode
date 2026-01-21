@@ -38,6 +38,37 @@ export interface MobileDeviceSettings {
   preset: string
 }
 
+export interface SubChatFileChange {
+  filePath: string
+  displayPath: string
+  additions: number
+  deletions: number
+}
+
+// Work mode preference (local = work in project dir, worktree = create isolated worktree)
+export type WorkMode = "local" | "worktree"
+
+// Pending user questions from AskUserQuestion tool
+export type PendingUserQuestions = {
+  subChatId: string
+  toolUseId: string
+  questions: Array<{
+    question: string
+    header: string
+    options: Array<{ label: string; description: string }>
+    multiSelect: boolean
+  }>
+}
+
+// Unified undo stack for workspace and sub-chat archivation
+export type UndoItem =
+  | { type: "workspace"; chatId: string; timeoutId: ReturnType<typeof setTimeout> }
+  | { type: "subchat"; subChatId: string; chatId: string; timeoutId: ReturnType<typeof setTimeout> }
+
+// Constants for user questions
+export const QUESTIONS_SKIPPED_MESSAGE = "User skipped questions - proceed with defaults"
+export const QUESTIONS_TIMED_OUT_MESSAGE = "Timed out"
+
 // ============================================
 // CUSTOM EVENT FOR TAB CHANGES
 // ============================================
@@ -124,6 +155,12 @@ interface SessionState {
   pendingPlanApprovals: Set<string>
 
   // ═══════════════════════════════════════════
+  // FILE CHANGES TRACKING
+  // ═══════════════════════════════════════════
+  subChatFiles: Map<string, SubChatFileChange[]> // sessionId → file changes
+  subChatToChatMap: Map<string, string> // sessionId → workspaceId
+
+  // ═══════════════════════════════════════════
   // ACTIONS - Workspace
   // ═══════════════════════════════════════════
   setWorkspaceId: (id: string | null) => void
@@ -178,6 +215,12 @@ interface SessionState {
   clearQuestionResult: (toolUseId: string) => void
   addPendingPlanApproval: (sessionId: string) => void
   removePendingPlanApproval: (sessionId: string) => void
+
+  // ═══════════════════════════════════════════
+  // ACTIONS - File Changes
+  // ═══════════════════════════════════════════
+  setSubChatFiles: (sessionId: string, files: SubChatFileChange[]) => void
+  setSubChatToChatMap: (sessionId: string, chatId: string) => void
 
   // ═══════════════════════════════════════════
   // ACTIONS - Reset
@@ -238,6 +281,9 @@ export const useSessionStore = create<SessionState>()(
       pendingQuestions: null,
       questionResults: new Map(),
       pendingPlanApprovals: new Set(),
+
+      subChatFiles: new Map(),
+      subChatToChatMap: new Map(),
 
       // ═══════════════════════════════════════════
       // ACTIONS - Workspace
@@ -506,6 +552,24 @@ export const useSessionStore = create<SessionState>()(
         const next = new Set(pendingPlanApprovals)
         next.delete(sessionId)
         set({ pendingPlanApprovals: next })
+      },
+
+      // ═══════════════════════════════════════════
+      // ACTIONS - File Changes
+      // ═══════════════════════════════════════════
+
+      setSubChatFiles: (sessionId, files) => {
+        const { subChatFiles } = get()
+        const next = new Map(subChatFiles)
+        next.set(sessionId, files)
+        set({ subChatFiles: next })
+      },
+
+      setSubChatToChatMap: (sessionId, chatId) => {
+        const { subChatToChatMap } = get()
+        const next = new Map(subChatToChatMap)
+        next.set(sessionId, chatId)
+        set({ subChatToChatMap: next })
       },
 
       // ═══════════════════════════════════════════

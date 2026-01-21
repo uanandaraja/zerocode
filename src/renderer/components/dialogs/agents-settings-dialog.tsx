@@ -1,10 +1,9 @@
-import { useAtom } from "jotai"
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion } from "motion/react"
 import { X, Bug, ChevronLeft, ChevronRight } from "lucide-react"
 import { cn } from "../../lib/utils"
-import { agentsSettingsDialogActiveTabAtom, type SettingsTab } from "../../lib/atoms"
+import { useUIStore, type SettingsTab } from "../../stores"
 import {
   EyeOpenFilledIcon,
   SlidersFilledIcon,
@@ -141,7 +140,8 @@ export function AgentsSettingsDialog({
   isOpen,
   onClose,
 }: AgentsSettingsDialogProps) {
-  const [activeTab, setActiveTab] = useAtom(agentsSettingsDialogActiveTabAtom)
+  const activeTab = useUIStore((state) => state.dialogs.settingsTab)
+  const setActiveTab = useUIStore((state) => state.setSettingsTab)
   const [mounted, setMounted] = useState(false)
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
   const isNarrowScreen = useIsNarrowScreen()

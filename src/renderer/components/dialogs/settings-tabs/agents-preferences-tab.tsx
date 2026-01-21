@@ -1,12 +1,5 @@
-import { useAtom } from "jotai"
 import { useState, useEffect } from "react"
-import {
-  extendedThinkingEnabledAtom,
-  soundNotificationsEnabledAtom,
-  analyticsOptOutAtom,
-  ctrlTabTargetAtom,
-  type CtrlTabTarget,
-} from "../../../lib/atoms"
+import { useUIStore } from "../../../stores"
 import { Switch } from "../../ui/switch"
 import {
   Select,
@@ -15,6 +8,8 @@ import {
   SelectTrigger,
 } from "../../ui/select"
 import { Kbd } from "../../ui/kbd"
+
+type CtrlTabTarget = "workspaces" | "sessions"
 
 // Hook to detect narrow screen
 function useIsNarrowScreen(): boolean {
@@ -34,12 +29,22 @@ function useIsNarrowScreen(): boolean {
 }
 
 export function AgentsPreferencesTab() {
-  const [thinkingEnabled, setThinkingEnabled] = useAtom(
-    extendedThinkingEnabledAtom,
-  )
-  const [soundEnabled, setSoundEnabled] = useAtom(soundNotificationsEnabledAtom)
-  const [analyticsOptOut, setAnalyticsOptOut] = useAtom(analyticsOptOutAtom)
-  const [ctrlTabTarget, setCtrlTabTarget] = useAtom(ctrlTabTargetAtom)
+  const thinkingEnabled = useUIStore((s) => s.preferences.extendedThinking)
+  const setThinkingEnabled = (value: boolean) => 
+    useUIStore.getState().setPreference("extendedThinking", value)
+  
+  const soundEnabled = useUIStore((s) => s.preferences.soundNotifications)
+  const setSoundEnabled = (value: boolean) => 
+    useUIStore.getState().setPreference("soundNotifications", value)
+  
+  const analyticsOptOut = useUIStore((s) => s.preferences.analyticsOptOut)
+  const setAnalyticsOptOut = (value: boolean) => 
+    useUIStore.getState().setPreference("analyticsOptOut", value)
+  
+  const ctrlTabTarget = useUIStore((s) => s.preferences.ctrlTabTarget)
+  const setCtrlTabTarget = (value: CtrlTabTarget) => 
+    useUIStore.getState().setPreference("ctrlTabTarget", value)
+  
   const isNarrowScreen = useIsNarrowScreen()
 
   // Sync opt-out status to main process

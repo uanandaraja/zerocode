@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react"
+import { useCallback, useEffect, useMemo } from "react"
 import {
   createRouter,
   createRootRoute,
@@ -15,7 +15,8 @@ import { TooltipProvider } from "./components/ui/tooltip"
 import { VSCodeThemeProvider } from "./lib/themes/theme-provider"
 import { SelectRepoPage } from "./features/onboarding"
 import { AgentsLayout } from "./features/layout/agents-layout"
-import { useUIStore } from "./stores"
+import { WorkspaceProvider } from "./contexts/WorkspaceContext"
+import { useUIStore, useSessionStore } from "./stores"
 import { trpc } from "./lib/trpc"
 
 // ============================================
@@ -105,16 +106,107 @@ function IndexPage() {
 }
 
 // ============================================
+// NEW WORKSPACE PAGE - Creating a new workspace
+// ============================================
+
+function NewWorkspacePage() {
+  const navigate = useNavigate()
+
+  // Clear workspace in session store
+  const setWorkspaceId = useSessionStore((s) => s.setWorkspaceId)
+  useEffect(() => {
+    setWorkspaceId(null)
+  }, [setWorkspaceId])
+
+  // Navigation callbacks for child components
+  const navigateToWorkspace = useCallback(
+    (newWorkspaceId: string) => {
+      navigate({
+        to: "/workspace/$workspaceId",
+        params: { workspaceId: newWorkspaceId },
+        search: {},
+      })
+    },
+    [navigate]
+  )
+
+  const navigateToSession = useCallback(
+    (_newSessionId: string) => {
+      // No-op when creating new workspace (no workspace yet)
+    },
+    []
+  )
+
+  const navigateToNewWorkspace = useCallback(() => {
+    // Already on new workspace page
+  }, [])
+
+  return (
+    <WorkspaceProvider
+      workspaceId={null}
+      sessionId={null}
+      navigateToWorkspace={navigateToWorkspace}
+      navigateToSession={navigateToSession}
+      navigateToNewWorkspace={navigateToNewWorkspace}
+    >
+      <AgentsLayout />
+    </WorkspaceProvider>
+  )
+}
+
+// ============================================
 // WORKSPACE PAGE - Main App View
 // ============================================
 
 function WorkspacePage() {
+  const navigate = useNavigate()
   const { workspaceId } = useParams({ from: "/workspace/$workspaceId" })
   const { sessionId } = useSearch({ from: "/workspace/$workspaceId" })
 
-  // For now, render the existing AgentsLayout
-  // TODO: Pass workspaceId and sessionId to AgentsLayout via context or props
-  return <AgentsLayout />
+  // Initialize session store with workspaceId when it changes
+  const setWorkspaceId = useSessionStore((s) => s.setWorkspaceId)
+  useEffect(() => {
+    setWorkspaceId(workspaceId)
+  }, [workspaceId, setWorkspaceId])
+
+  // Navigation callbacks for child components
+  const navigateToWorkspace = useCallback(
+    (newWorkspaceId: string) => {
+      navigate({
+        to: "/workspace/$workspaceId",
+        params: { workspaceId: newWorkspaceId },
+        search: {},
+      })
+    },
+    [navigate]
+  )
+
+  const navigateToSession = useCallback(
+    (newSessionId: string) => {
+      navigate({
+        to: "/workspace/$workspaceId",
+        params: { workspaceId },
+        search: { sessionId: newSessionId },
+      })
+    },
+    [navigate, workspaceId]
+  )
+
+  const navigateToNewWorkspace = useCallback(() => {
+    navigate({ to: "/workspace/new" })
+  }, [navigate])
+
+  return (
+    <WorkspaceProvider
+      workspaceId={workspaceId}
+      sessionId={sessionId ?? null}
+      navigateToWorkspace={navigateToWorkspace}
+      navigateToSession={navigateToSession}
+      navigateToNewWorkspace={navigateToNewWorkspace}
+    >
+      <AgentsLayout />
+    </WorkspaceProvider>
+  )
 }
 
 // ============================================
@@ -131,6 +223,12 @@ const indexRoute = createRoute({
   component: IndexPage,
 })
 
+const newWorkspaceRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/workspace/new",
+  component: NewWorkspacePage,
+})
+
 const workspaceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/workspace/$workspaceId",
@@ -144,7 +242,9 @@ const workspaceRoute = createRoute({
 // ROUTER TREE & INSTANCE
 // ============================================
 
-const routeTree = rootRoute.addChildren([indexRoute, workspaceRoute])
+// Note: newWorkspaceRoute must come before workspaceRoute so "/workspace/new" 
+// doesn't get matched as a workspaceId parameter
+const routeTree = rootRoute.addChildren([indexRoute, newWorkspaceRoute, workspaceRoute])
 
 export const router = createRouter({
   routeTree,
