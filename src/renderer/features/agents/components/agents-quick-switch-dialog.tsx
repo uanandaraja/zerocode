@@ -3,8 +3,7 @@
 import { useMemo } from "react"
 import { AnimatePresence } from "motion/react"
 import { createPortal } from "react-dom"
-import { useAtomValue } from "jotai"
-import { loadingSubChatsAtom } from "../atoms"
+import { useSessionStore } from "../../../stores"
 import { AgentChatCard } from "./agent-chat-card"
 
 interface AgentsQuickSwitchDialogProps {
@@ -31,11 +30,11 @@ export function AgentsQuickSwitchDialog({
 }: AgentsQuickSwitchDialogProps) {
   if (typeof window === "undefined") return null
 
-  // Derive loading parent chat IDs from loadingSubChats Map
-  const loadingSubChats = useAtomValue(loadingSubChatsAtom)
+  // Derive loading parent chat IDs from loadingSessions Map
+  const loadingSessions = useSessionStore((s) => s.loadingSessions)
   const loadingChatIds = useMemo(
-    () => new Set([...loadingSubChats.values()]),
-    [loadingSubChats],
+    () => new Set([...loadingSessions.values()]),
+    [loadingSessions],
   )
 
   return createPortal(

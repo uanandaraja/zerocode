@@ -8,10 +8,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "../../../components/ui/hover-card"
-import { useSetAtom, atom } from "jotai"
-// import { agentsSettingsDialogOpenAtom, agentsSettingsDialogActiveTabAtom } from "@/lib/atoms/agents-settings-dialog"
-const agentsSettingsDialogOpenAtom = atom(false)
-const agentsSettingsDialogActiveTabAtom = atom<string | null>(null)
+import { useUIStore } from "../../../stores"
 import { GitHubIcon } from "../../../icons"
 
 interface PreviewSetupHoverCardProps {
@@ -20,13 +17,14 @@ interface PreviewSetupHoverCardProps {
 
 export function PreviewSetupHoverCard({ children }: PreviewSetupHoverCardProps) {
   const { resolvedTheme } = useTheme()
-  const setSettingsDialogOpen = useSetAtom(agentsSettingsDialogOpenAtom)
-  const setSettingsActiveTab = useSetAtom(agentsSettingsDialogActiveTabAtom)
+  const openDialog = useUIStore((s) => s.openDialog)
+  const setSettingsTab = useUIStore((s) => s.setSettingsTab)
   const [open, setOpen] = useState(false)
 
   const handleOpenSettings = () => {
-    setSettingsActiveTab("github")
-    setSettingsDialogOpen(true)
+    // Note: "github" tab doesn't exist in SettingsTab type, using closest equivalent
+    setSettingsTab("preferences")
+    openDialog("settings")
     setOpen(false)
   }
 

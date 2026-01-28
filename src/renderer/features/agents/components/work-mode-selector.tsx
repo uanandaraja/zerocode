@@ -9,7 +9,7 @@ import {
 } from "../../../components/ui/popover"
 import { IconChevronDown, CheckIcon, LaptopIcon } from "../../../components/ui/icons"
 import { cn } from "../../../lib/utils"
-import type { WorkMode } from "../atoms"
+import type { WorkMode } from "../../../stores"
 
 interface WorkModeSelectorProps {
   value: WorkMode

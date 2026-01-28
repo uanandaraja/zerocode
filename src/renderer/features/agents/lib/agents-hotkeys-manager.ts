@@ -11,7 +11,7 @@ import {
   executeAgentAction,
   getAvailableAgentActions,
 } from "./agents-actions"
-import type { SettingsTab } from "../../../lib/atoms"
+import type { SettingsTab } from "../../../stores"
 
 // ============================================================================
 // HOTKEY MATCHING

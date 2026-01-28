@@ -2,33 +2,25 @@
 
 import React, { useMemo, useState, useCallback, useRef, useEffect, memo } from "react"
 import { createPortal } from "react-dom"
-import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { motion, AnimatePresence } from "motion/react"
 import { Button } from "../../components/ui/button"
 import { Input } from "../../components/ui/input"
 import { cn } from "../../lib/utils"
-import {
-  loadingSubChatsAtom,
-  agentsSubChatUnseenChangesAtom,
-  selectedAgentChatIdAtom,
-  previousAgentChatIdAtom,
-  subChatFilesAtom,
-  justCreatedIdsAtom,
-  pendingUserQuestionsAtom,
-  undoStackAtom,
-  type UndoItem,
-} from "../agents/atoms"
-import {
-  selectedTeamIdAtom,
-  selectedSubChatIdsAtom,
-  isSubChatMultiSelectModeAtom,
-  toggleSubChatSelectionAtom,
-  selectAllSubChatsAtom,
-  clearSubChatSelectionAtom,
-  selectedSubChatsCountAtom,
-  isDesktopAtom,
-  isFullscreenAtom,
-} from "../../lib/atoms"
+
+// UndoItem type for undo stack
+type UndoItem =
+  | { type: "workspace"; chatId: string; timeoutId: ReturnType<typeof setTimeout> }
+  | { type: "subchat"; subChatId: string; chatId: string; timeoutId: ReturnType<typeof setTimeout> }
+
+// SubChatFileChange type
+interface SubChatFileChange {
+  filePath: string
+  displayPath: string
+  additions: number
+  deletions: number
+}
+import { useOptionalWorkspaceContext } from "../../contexts/WorkspaceContext"
+import { useUIStore, useSessionStore } from "../../stores"
 import { trpc } from "../../lib/trpc"
 import {
   useAgentSubChatStore,
@@ -92,7 +84,7 @@ interface SidebarSearchHistoryPopoverProps {
   sortedSubChats: SubChatMeta[]
   loadingSubChats: Map<string, string>
   subChatUnseenChanges: Set<string>
-  pendingQuestions: { subChatId: string } | null
+  pendingQuestions: { sessionId: string } | null
   allSubChatsLength: number
   onSelect: (subChat: SubChatMeta) => void
   isOpen?: boolean
@@ -119,7 +111,7 @@ const SidebarSearchHistoryPopover = memo(function SidebarSearchHistoryPopover({
     const isLoading = loadingSubChats.has(subChat.id)
     const hasUnseen = subChatUnseenChanges.has(subChat.id)
     const mode = subChat.mode || "agent"
-    const hasPendingQuestion = pendingQuestions?.subChatId === subChat.id
+    const hasPendingQuestion = pendingQuestions?.sessionId === subChat.id
 
     return (
       <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -212,11 +204,33 @@ export function AgentsSubChatsSidebar({
       togglePinSubChat: state.togglePinSubChat,
     }))
   )
-  const [loadingSubChats] = useAtom(loadingSubChatsAtom)
-  const subChatFiles = useAtomValue(subChatFilesAtom)
-  const selectedTeamId = useAtomValue(selectedTeamIdAtom)
-  const [selectedChatId, setSelectedChatId] = useAtom(selectedAgentChatIdAtom)
-  const previousChatId = useAtomValue(previousAgentChatIdAtom)
+  const loadingSubChats = useSessionStore((s) => s.loadingSessions)
+  // SubChat file changes - using local state (can be populated from props or context if needed)
+  const [subChatFiles] = useState<Map<string, SubChatFileChange[]>>(new Map())
+  const selectedTeamId = useUIStore((s) => s.selectedTeamId)
+  
+  // Get workspace from URL via context
+  const workspaceContext = useOptionalWorkspaceContext()
+  const selectedChatId = workspaceContext?.workspaceId ?? null
+  
+  // Navigation helper using router context
+  const setSelectedChatId = useCallback((id: string | null) => {
+    if (id) {
+      workspaceContext?.navigateToWorkspace(id)
+    } else {
+      workspaceContext?.navigateToNewWorkspace()
+    }
+  }, [workspaceContext])
+
+  // Previous chat ID for navigation after archive (local state with tracking)
+  const [previousChatId, setPreviousChatId] = useState<string | null>(null)
+  const prevSelectedChatIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (prevSelectedChatIdRef.current && prevSelectedChatIdRef.current !== selectedChatId) {
+      setPreviousChatId(prevSelectedChatIdRef.current)
+    }
+    prevSelectedChatIdRef.current = selectedChatId
+  }, [selectedChatId])
 
   // Fetch agent chats for navigation after archive
   const { data: agentChats } = api.agents.getAgentChats.useQuery(
@@ -245,10 +259,44 @@ export function AgentsSubChatsSidebar({
       }
     },
   })
-  const subChatUnseenChanges = useAtomValue(agentsSubChatUnseenChangesAtom)
-  const setSubChatUnseenChanges = useSetAtom(agentsSubChatUnseenChangesAtom)
-  const [justCreatedIds, setJustCreatedIds] = useAtom(justCreatedIdsAtom)
-  const pendingQuestions = useAtomValue(pendingUserQuestionsAtom)
+  const subChatUnseenChanges = useSessionStore((s) => s.unseenChanges)
+  const markSeen = useSessionStore((s) => s.markSeen)
+  const setSubChatUnseenChanges = (updater: (prev: Set<string>) => Set<string>) => {
+    // This is a compatibility shim for the old setter pattern
+    // We can simplify this later to use markSeen/markUnseen directly
+    const current = useSessionStore.getState().unseenChanges
+    const next = updater(current)
+    // Find what was removed to mark as seen
+    for (const id of current) {
+      if (!next.has(id)) {
+        useSessionStore.getState().markSeen(id)
+      }
+    }
+    // Find what was added to mark as unseen
+    for (const id of next) {
+      if (!current.has(id)) {
+        useSessionStore.getState().markUnseen(id)
+      }
+    }
+  }
+  const justCreatedIds = useSessionStore((s) => s.justCreatedIds)
+  const setJustCreatedIds = (updater: (prev: Set<string>) => Set<string>) => {
+    const current = useSessionStore.getState().justCreatedIds
+    const next = updater(current)
+    // Find what was removed
+    for (const id of current) {
+      if (!next.has(id)) {
+        useSessionStore.getState().removeJustCreated(id)
+      }
+    }
+    // Find what was added
+    for (const id of next) {
+      if (!current.has(id)) {
+        useSessionStore.getState().addJustCreated(id)
+      }
+    }
+  }
+  const pendingQuestions = useSessionStore((s) => s.pendingQuestions)
 
   // Pending plan approvals from DB - only for open sub-chats
   const { data: pendingPlanApprovalsData } = trpc.chats.getPendingPlanApprovals.useQuery(
@@ -265,8 +313,8 @@ export function AgentsSubChatsSidebar({
     return set
   }, [pendingPlanApprovalsData])
 
-  // Unified undo stack for Cmd+Z support
-  const setUndoStack = useSetAtom(undoStackAtom)
+  // Unified undo stack for Cmd+Z support (local state)
+  const [, setUndoStack] = useState<UndoItem[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [focusedChatIndex, setFocusedChatIndex] = useState<number>(-1)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -292,19 +340,18 @@ export function AgentsSubChatsSidebar({
   const subChatTooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
 
-  // Multi-select state
-  const [selectedSubChatIds, setSelectedSubChatIds] = useAtom(
-    selectedSubChatIdsAtom,
-  )
-  const isMultiSelectMode = useAtomValue(isSubChatMultiSelectModeAtom)
-  const selectedSubChatsCount = useAtomValue(selectedSubChatsCountAtom)
-  const toggleSubChatSelection = useSetAtom(toggleSubChatSelectionAtom)
-  const selectAllSubChats = useSetAtom(selectAllSubChatsAtom)
-  const clearSubChatSelection = useSetAtom(clearSubChatSelectionAtom)
+  // Multi-select state from Zustand
+  const selectedSubChatIds = useUIStore((s) => s.selectedSessionIds)
+  const setSelectedSubChatIds = useUIStore((s) => s.selectAllSessions)
+  const isMultiSelectMode = useUIStore((s) => s.selectedSessionIds.size > 0)
+  const selectedSubChatsCount = useUIStore((s) => s.selectedSessionIds.size)
+  const toggleSubChatSelection = useUIStore((s) => s.toggleSessionSelection)
+  const selectAllSubChats = useUIStore((s) => s.selectAllSessions)
+  const clearSubChatSelection = useUIStore((s) => s.clearSessionSelection)
 
-  // Global desktop/fullscreen state from atoms (initialized in AgentsLayout)
-  const isDesktop = useAtomValue(isDesktopAtom)
-  const isFullscreen = useAtomValue(isFullscreenAtom)
+  // Global desktop/fullscreen state from Zustand store (initialized in AgentsLayout)
+  const isDesktop = useUIStore((s) => s.isDesktop)
+  const isFullscreen = useUIStore((s) => s.isFullscreen)
 
   // Map open IDs to metadata and sort by updated_at (most recent first)
   const openSubChats = useMemo(() => {
@@ -866,7 +913,7 @@ export function AgentsSubChatsSidebar({
           newSelection.add(chat.id)
         }
       }
-      setSelectedSubChatIds(newSelection)
+      setSelectedSubChatIds(Array.from(newSelection))
       return
     }
 
@@ -1190,7 +1237,7 @@ export function AgentsSubChatsSidebar({
                           const mode = subChat.mode || "agent"
                           const isChecked = selectedSubChatIds.has(subChat.id)
                           const draftText = getDraftText(subChat.id)
-                          const hasPendingQuestion = pendingQuestions?.subChatId === subChat.id
+                          const hasPendingQuestion = pendingQuestions?.sessionId === subChat.id
                           const hasPendingPlan = pendingPlanApprovals.has(subChat.id)
                           const fileChanges = subChatFiles.get(subChat.id) || []
                           const stats =
@@ -1463,7 +1510,7 @@ export function AgentsSubChatsSidebar({
                           const mode = subChat.mode || "agent"
                           const isChecked = selectedSubChatIds.has(subChat.id)
                           const draftText = getDraftText(subChat.id)
-                          const hasPendingQuestion = pendingQuestions?.subChatId === subChat.id
+                          const hasPendingQuestion = pendingQuestions?.sessionId === subChat.id
                           const hasPendingPlan = pendingPlanApprovals.has(subChat.id)
                           const fileChanges = subChatFiles.get(subChat.id) || []
                           const stats =

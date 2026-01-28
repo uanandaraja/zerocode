@@ -1,6 +1,5 @@
 import { useEffect, useCallback } from "react"
-import { useAtom } from "jotai"
-import { justUpdatedAtom, justUpdatedVersionAtom } from "../atoms"
+import { useUIStore } from "../../stores"
 
 const LAST_VERSION_KEY = "app:last-version"
 
@@ -9,10 +8,9 @@ const LAST_VERSION_KEY = "app:last-version"
  * Compares current version with stored version and shows "What's New" banner
  */
 export function useJustUpdated() {
-  const [justUpdated, setJustUpdated] = useAtom(justUpdatedAtom)
-  const [justUpdatedVersion, setJustUpdatedVersion] = useAtom(
-    justUpdatedVersionAtom,
-  )
+  const justUpdated = useUIStore((state) => state.updateState.justUpdated)
+  const justUpdatedVersion = useUIStore((state) => state.updateState.justUpdatedVersion)
+  const setUpdateState = useUIStore((state) => state.setUpdateState)
 
   // Check for update on mount
   useEffect(() => {
@@ -26,8 +24,7 @@ export function useJustUpdated() {
 
         // If this is first launch or version changed, show "What's New"
         if (lastVersion && lastVersion !== currentVersion) {
-          setJustUpdated(true)
-          setJustUpdatedVersion(currentVersion)
+          setUpdateState({ justUpdated: true, justUpdatedVersion: currentVersion })
         }
 
         // Always update stored version
@@ -38,13 +35,12 @@ export function useJustUpdated() {
     }
 
     checkForUpdate()
-  }, [setJustUpdated, setJustUpdatedVersion])
+  }, [setUpdateState])
 
   // Dismiss the "What's New" banner
   const dismissJustUpdated = useCallback(() => {
-    setJustUpdated(false)
-    setJustUpdatedVersion(null)
-  }, [setJustUpdated, setJustUpdatedVersion])
+    setUpdateState({ justUpdated: false, justUpdatedVersion: null })
+  }, [setUpdateState])
 
   // Dismiss and acknowledge the update
   const openChangelog = useCallback(() => {

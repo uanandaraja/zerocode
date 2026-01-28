@@ -3,17 +3,16 @@
 import { useMemo } from "react"
 import { AnimatePresence } from "motion/react"
 import { createPortal } from "react-dom"
-import { useAtomValue } from "jotai"
 import { cn } from "../../../lib/utils"
 import {
-  loadingSubChatsAtom,
-  agentsSubChatUnseenChangesAtom,
-  subChatFilesAtom,
+  useSessionStore,
+  type SessionMeta,
   type SubChatFileChange,
-} from "../atoms"
+} from "../../../stores"
 import { IconSpinner, PlanIcon, AgentIcon } from "../../../components/ui/icons"
-import type { SubChatMeta } from "../stores/sub-chat-store"
 import { formatTimeAgo } from "../utils/format-time-ago"
+
+type SubChatMeta = SessionMeta
 
 interface SubChatsQuickSwitchDialogProps {
   isOpen: boolean
@@ -36,7 +35,7 @@ function SubChatCard({
   fileChanges: SubChatFileChange[]
 }) {
   const mode = subChat.mode || "agent"
-  const timeAgo = formatTimeAgo(subChat.updated_at || subChat.created_at)
+  const timeAgo = formatTimeAgo(subChat.updatedAt || subChat.createdAt)
 
   // Calculate totals from file changes
   const stats = useMemo(() => {
@@ -181,18 +180,18 @@ export function SubChatsQuickSwitchDialog({
 }: SubChatsQuickSwitchDialogProps) {
   if (typeof window === "undefined") return null
 
-  // Derive loading sub-chat IDs
-  const loadingSubChats = useAtomValue(loadingSubChatsAtom)
+  // Derive loading sub-chat IDs from Zustand store
+  const loadingSessions = useSessionStore((s) => s.loadingSessions)
   const loadingSubChatIds = useMemo(
-    () => new Set([...loadingSubChats.keys()]),
-    [loadingSubChats],
+    () => new Set([...loadingSessions.keys()]),
+    [loadingSessions],
   )
 
-  // Unseen changes
-  const unseenChanges = useAtomValue(agentsSubChatUnseenChangesAtom)
+  // Unseen changes from Zustand store
+  const unseenChanges = useSessionStore((s) => s.unseenChanges)
 
   // File changes per sub-chat
-  const subChatFiles = useAtomValue(subChatFilesAtom)
+  const subChatFiles = useSessionStore((s) => s.subChatFiles)
 
   return createPortal(
     <AnimatePresence>

@@ -1,8 +1,7 @@
 "use client"
 
 import { useCallback, useMemo, useState } from "react"
-import { useAtomValue } from "jotai"
-import { loadingSubChatsAtom } from "../atoms"
+import { useSessionStore } from "../../../stores"
 import { Plus, ChevronDown, Play, AlignJustify } from "lucide-react"
 import {
   IconSpinner,
@@ -59,7 +58,7 @@ export function MobileChatHeader({
 }: MobileChatHeaderProps) {
   const activeSubChatId = useAgentSubChatStore((state) => state.activeSubChatId)
   const allSubChats = useAgentSubChatStore((state) => state.allSubChats)
-  const loadingSubChatsAtomValue = useAtomValue(loadingSubChatsAtom)
+  const loadingSessions = useSessionStore((state) => state.loadingSessions)
 
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
 
@@ -69,7 +68,7 @@ export function MobileChatHeader({
   }, [allSubChats, activeSubChatId])
 
   const isLoading = activeSubChatId
-    ? loadingSubChatsAtomValue.has(activeSubChatId)
+    ? loadingSessions.has(activeSubChatId)
     : false
   const mode = activeSubChat?.mode || "agent"
 

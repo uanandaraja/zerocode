@@ -1,14 +1,12 @@
 "use client"
 
-import { useAtom } from "jotai"
-
 import { IconSpinner } from "../../components/ui/icons"
 import { Logo } from "../../components/ui/logo"
 import { trpc } from "../../lib/trpc"
-import { selectedProjectAtom } from "../agents/atoms"
+import { useUIStore } from "../../stores"
 
 export function SelectRepoPage() {
-  const [, setSelectedProject] = useAtom(selectedProjectAtom)
+  const setSelectedProject = useUIStore((s) => s.setSelectedProject)
 
   // Get tRPC utils for cache management
   const utils = trpc.useUtils()

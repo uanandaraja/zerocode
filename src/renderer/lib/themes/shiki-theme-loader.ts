@@ -1,7 +1,7 @@
 import * as shiki from "shiki"
 import { isBuiltinTheme } from "../vscode-themes"
 import { getBuiltinThemeById } from "./builtin-themes"
-import type { VSCodeFullTheme } from "../atoms"
+import type { VSCodeFullTheme } from "../../stores"
 
 /**
  * Shared Shiki highlighter instance

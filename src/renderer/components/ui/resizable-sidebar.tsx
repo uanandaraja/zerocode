@@ -1,6 +1,5 @@
 "use client"
 
-import { useAtom, type WritableAtom } from "jotai"
 import { AnimatePresence, motion } from "motion/react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal, flushSync } from "react-dom"
@@ -9,7 +8,10 @@ import { Kbd } from "./kbd"
 interface ResizableSidebarProps {
   isOpen: boolean
   onClose: () => void
-  widthAtom: WritableAtom<number, [number], void>
+  /** Current sidebar width */
+  width: number
+  /** Callback to set sidebar width */
+  setWidth: (width: number) => void
   minWidth?: number
   maxWidth?: number
   side: "left" | "right"
@@ -37,7 +39,8 @@ const EXTENDED_HOVER_AREA_WIDTH = 8
 export function ResizableSidebar({
   isOpen,
   onClose,
-  widthAtom,
+  width: sidebarWidth,
+  setWidth: setSidebarWidth,
   minWidth = DEFAULT_MIN_WIDTH,
   maxWidth = DEFAULT_MAX_WIDTH,
   side,
@@ -52,7 +55,6 @@ export function ResizableSidebar({
   showResizeTooltip = false,
   style,
 }: ResizableSidebarProps) {
-  const [sidebarWidth, setSidebarWidth] = useAtom(widthAtom)
 
   // Track if this is the first open to avoid initial animation when already open
   const hasOpenedOnce = useRef(false)

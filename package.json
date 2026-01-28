@@ -26,7 +26,6 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.14",
-
     "@opencode-ai/sdk": "^1.1.25",
     "@pierre/diffs": "^1.0.6",
     "@radix-ui/react-accordion": "^1.2.11",
@@ -49,6 +48,7 @@
     "@sentry/electron": "^7.5.0",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-query": "^5.90.10",
+    "@tanstack/react-router": "^1.153.2",
     "@tanstack/react-virtual": "^3.13.18",
     "@trpc/client": "^11.7.1",
     "@trpc/react-query": "^11.7.1",

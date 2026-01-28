@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react"
-import { useAtom } from "jotai"
 import { Button } from "../../../components/ui/button"
 import { RotateCw } from "lucide-react"
 import {
@@ -10,12 +9,7 @@ import {
   IconChatBubble,
 } from "../../../components/ui/icons"
 import { PreviewUrlInput } from "./preview-url-input"
-import {
-  previewPathAtomFamily,
-  viewportModeAtomFamily,
-  previewScaleAtomFamily,
-  mobileDeviceAtomFamily,
-} from "../atoms"
+import { useSessionStore } from "../../../stores"
 import { cn } from "../../../lib/utils"
 import { ViewportToggle } from "./viewport-toggle"
 import { ScaleControl } from "./scale-control"
@@ -51,15 +45,26 @@ export function AgentPreview({
   const frameRef = useRef<HTMLDivElement>(null)
   const resizeCleanupRef = useRef<(() => void) | null>(null)
 
-  // Persisted state from Jotai atoms (per chatId)
-  const [persistedPath, setPersistedPath] = useAtom(
-    previewPathAtomFamily(chatId),
-  )
-  const [viewportMode, setViewportMode] = useAtom(
-    viewportModeAtomFamily(chatId),
-  )
-  const [scale, setScale] = useAtom(previewScaleAtomFamily(chatId))
-  const [device, setDevice] = useAtom(mobileDeviceAtomFamily(chatId))
+  // Persisted state from session store (per chatId/sessionId)
+  const persistedPath = useSessionStore((state) => state.previewPaths[chatId] ?? "/")
+  const _setPreviewPath = useSessionStore((state) => state.setPreviewPath)
+  const setPersistedPath = useCallback((path: string) => _setPreviewPath(chatId, path), [chatId, _setPreviewPath])
+  
+  const viewportMode = useSessionStore((state) => state.viewportModes[chatId] ?? "desktop")
+  const _setViewportMode = useSessionStore((state) => state.setViewportMode)
+  const setViewportMode = useCallback((mode: "desktop" | "mobile") => _setViewportMode(chatId, mode), [chatId, _setViewportMode])
+  
+  const scale = useSessionStore((state) => state.previewScales[chatId] ?? 100)
+  const _setPreviewScale = useSessionStore((state) => state.setPreviewScale)
+  const setScale = useCallback((value: number) => _setPreviewScale(chatId, value), [chatId, _setPreviewScale])
+  
+  const device = useSessionStore((state) => state.mobileDevices[chatId] ?? { 
+    width: AGENTS_PREVIEW_CONSTANTS.DEFAULT_WIDTH, 
+    height: AGENTS_PREVIEW_CONSTANTS.DEFAULT_HEIGHT, 
+    preset: "iPhone 15 Pro" 
+  })
+  const _setMobileDevice = useSessionStore((state) => state.setMobileDevice)
+  const setDevice = useCallback((device: { width: number; height: number; preset: string }) => _setMobileDevice(chatId, device), [chatId, _setMobileDevice])
 
   // Local state for resizing
   const [isResizing, setIsResizing] = useState(false)

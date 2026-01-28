@@ -71,14 +71,14 @@ export function UpdateBanner() {
   const displayVersion = justUpdatedVersion || currentVersion
 
   // For mocking just-updated, force idle state so only the "What's New" banner shows
-  const state =
+  const state: typeof realState =
     isMocking && MOCK_STATE === "just-updated"
-      ? { status: "idle" as const, progress: 0 }
+      ? { status: "idle", progress: 0 }
       : isMocking
         ? {
             status:
               mockStatus === "dismissed" || mockStatus === "just-updated"
-                ? ("idle" as const)
+                ? "idle"
                 : mockStatus,
             progress: mockProgress,
           }

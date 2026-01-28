@@ -1,6 +1,5 @@
 import { useEffect, useCallback, useRef } from "react"
-import { useAtom } from "jotai"
-import { updateStateAtom, type UpdateState } from "../atoms"
+import { useUIStore, type UpdateState } from "../../stores"
 
 // Note: Update checks are now triggered by window focus in main process (auto-updater.ts)
 // This hook only handles events and provides actions
@@ -12,7 +11,8 @@ const DISMISS_DURATION = 12 * 60 * 60 * 1000 // 12 hours
  * Listens to update events from main process and provides actions
  */
 export function useUpdateChecker() {
-  const [state, setState] = useAtom(updateStateAtom)
+  const state = useUIStore((s) => s.updateState)
+  const setUpdateState = useUIStore((s) => s.setUpdateState)
   const versionRef = useRef<string | undefined>(state.version)
 
   // Keep ref in sync with state
@@ -45,7 +45,7 @@ export function useUpdateChecker() {
     // Checking for updates
     unsubs.push(
       api.onUpdateChecking?.(() => {
-        setState({ status: "checking" })
+        setUpdateState({ status: "checking" })
       }),
     )
 
@@ -54,11 +54,11 @@ export function useUpdateChecker() {
       api.onUpdateAvailable?.((info) => {
         // Check if user dismissed this version
         if (isDismissed(info.version)) {
-          setState({ status: "idle" })
+          setUpdateState({ status: "idle" })
           return
         }
 
-        setState({
+        setUpdateState({
           status: "available",
           version: info.version,
         })
@@ -68,14 +68,14 @@ export function useUpdateChecker() {
     // No update available
     unsubs.push(
       api.onUpdateNotAvailable?.(() => {
-        setState({ status: "idle" })
+        setUpdateState({ status: "idle" })
       }),
     )
 
     // Download progress
     unsubs.push(
       api.onUpdateProgress?.((progress) => {
-        setState({
+        setUpdateState({
           status: "downloading",
           version: versionRef.current,
           progress: progress.percent,
@@ -89,7 +89,7 @@ export function useUpdateChecker() {
     // Update downloaded and ready
     unsubs.push(
       api.onUpdateDownloaded?.((info) => {
-        setState({
+        setUpdateState({
           status: "ready",
           version: info.version,
         })
@@ -100,7 +100,7 @@ export function useUpdateChecker() {
     unsubs.push(
       api.onUpdateError?.((error) => {
         console.error("[Update] Error:", error)
-        setState({
+        setUpdateState({
           status: "error",
           error,
         })
@@ -118,7 +118,7 @@ export function useUpdateChecker() {
     return () => {
       unsubs.forEach((unsub) => unsub?.())
     }
-  }, [setState, isDismissed])
+  }, [setUpdateState, isDismissed])
 
   // Note: Periodic checks removed - main process now checks on window focus
   // This is more natural UX and avoids unnecessary network requests
@@ -145,9 +145,9 @@ export function useUpdateChecker() {
           timestamp: Date.now(),
         }),
       )
-      setState({ status: "idle" })
+      setUpdateState({ status: "idle" })
     }
-  }, [state.version, setState])
+  }, [state.version, setUpdateState])
 
   return {
     state,

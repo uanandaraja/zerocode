@@ -6,8 +6,30 @@ if (import.meta.env.PROD) {
 }
 
 import ReactDOM from "react-dom/client"
-import { App } from "./App"
+import { RouterProvider } from "@tanstack/react-router"
+import { router } from "./router"
+import { initAnalytics, shutdown } from "./lib/analytics"
 import "./styles/globals.css"
+
+// Initialize analytics
+initAnalytics()
+
+// Sync analytics opt-out status to main process
+const syncOptOutStatus = async () => {
+  try {
+    const optOut =
+      localStorage.getItem("preferences:analytics-opt-out") === "true"
+    await window.desktopApi?.setAnalyticsOptOut(optOut)
+  } catch (error) {
+    console.warn("[Analytics] Failed to sync opt-out status:", error)
+  }
+}
+syncOptOutStatus()
+
+// Cleanup on unload
+window.addEventListener("beforeunload", () => {
+  shutdown()
+})
 
 // Suppress ResizeObserver loop error - this is a non-fatal browser warning
 // that can occur when layout changes trigger observation callbacks
@@ -38,5 +60,5 @@ window.onerror = (message, source, lineno, colno, error) => {
 const rootElement = document.getElementById("root")
 
 if (rootElement) {
-  ReactDOM.createRoot(rootElement).render(<App />)
+  ReactDOM.createRoot(rootElement).render(<RouterProvider router={router} />)
 }

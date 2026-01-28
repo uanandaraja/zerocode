@@ -6,22 +6,7 @@ import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "motion/react"
 import { Button as ButtonCustom } from "../../components/ui/button"
 import { cn } from "../../lib/utils"
-import { useSetAtom, useAtom, useAtomValue } from "jotai"
-import {
-  createTeamDialogOpenAtom,
-  agentsSettingsDialogActiveTabAtom,
-  agentsSettingsDialogOpenAtom,
-  agentsHelpPopoverOpenAtom,
-  agentsShortcutsDialogOpenAtom,
-  selectedAgentChatIdsAtom,
-  isAgentMultiSelectModeAtom,
-  toggleAgentChatSelectionAtom,
-  selectAllAgentChatsAtom,
-  clearAgentChatSelectionAtom,
-  selectedAgentChatsCountAtom,
-  isDesktopAtom,
-  isFullscreenAtom,
-} from "../../lib/atoms"
+import { useUIStore, useSessionStore } from "../../stores"
 import { ArchivePopover } from "../agents/ui/archive-popover"
 import { ChevronDown, MoreHorizontal } from "lucide-react"
 // import { useRouter } from "next/navigation" // Desktop doesn't use next/navigation
@@ -76,19 +61,11 @@ import {
 import { Logo } from "../../components/ui/logo"
 import { Input } from "../../components/ui/input"
 import { Button } from "../../components/ui/button"
-import {
-  selectedAgentChatIdAtom,
-  previousAgentChatIdAtom,
-  selectedDraftIdAtom,
-  loadingSubChatsAtom,
-  agentsUnseenChangesAtom,
-  archivePopoverOpenAtom,
-  agentsDebugModeAtom,
-  selectedProjectAtom,
-  justCreatedIdsAtom,
-  undoStackAtom,
-  type UndoItem,
-} from "../agents/atoms"
+// UndoItem type for undo stack
+type UndoItem =
+  | { type: "workspace"; chatId: string; timeoutId: ReturnType<typeof setTimeout> }
+  | { type: "subchat"; subChatId: string; chatId: string; timeoutId: ReturnType<typeof setTimeout> }
+import { useOptionalWorkspaceContext } from "../../contexts/WorkspaceContext"
 import { useAgentSubChatStore, OPEN_SUB_CHATS_CHANGE_EVENT } from "../agents/stores/sub-chat-store"
 import { AgentsHelpPopover } from "../agents/components/agents-help-popover"
 import { getShortcutKey, isDesktopApp } from "../../lib/utils/platform"
@@ -772,7 +749,7 @@ interface ArchiveSectionProps {
 }
 
 const ArchiveSection = memo(function ArchiveSection({ archivedChatsCount }: ArchiveSectionProps) {
-  const archivePopoverOpen = useAtomValue(archivePopoverOpenAtom)
+  const archivePopoverOpen = useUIStore((s) => s.archivePopoverOpen)
   const [blockArchiveTooltip, setBlockArchiveTooltip] = useState(false)
   const prevArchivePopoverOpen = useRef(false)
   const archiveButtonRef = useRef<HTMLButtonElement>(null)
@@ -1073,7 +1050,10 @@ interface HelpSectionProps {
 }
 
 const HelpSection = memo(function HelpSection({ isMobile }: HelpSectionProps) {
-  const [helpPopoverOpen, setHelpPopoverOpen] = useAtom(agentsHelpPopoverOpenAtom)
+  const helpPopoverOpen = useUIStore((s) => s.dialogs.help)
+  const openDialog = useUIStore((s) => s.openDialog)
+  const closeDialog = useUIStore((s) => s.closeDialog)
+  const setHelpPopoverOpen = (open: boolean) => open ? openDialog("help") : closeDialog("help")
   const [blockHelpTooltip, setBlockHelpTooltip] = useState(false)
   const prevHelpPopoverOpen = useRef(false)
   const helpButtonRef = useRef<HTMLButtonElement>(null)
@@ -1131,10 +1111,32 @@ export function AgentsSidebar({
   isMobileFullscreen = false,
   onChatSelect,
 }: AgentsSidebarProps) {
-  const [selectedChatId, setSelectedChatId] = useAtom(selectedAgentChatIdAtom)
-  const previousChatId = useAtomValue(previousAgentChatIdAtom)
-  const [selectedDraftId, setSelectedDraftId] = useAtom(selectedDraftIdAtom)
-  const [loadingSubChats] = useAtom(loadingSubChatsAtom)
+  // Get workspace from URL via context
+  const workspaceContext = useOptionalWorkspaceContext()
+  const selectedChatId = workspaceContext?.workspaceId ?? null
+  
+  // Navigation helper using router context
+  const setSelectedChatId = useCallback((id: string | null) => {
+    if (id) {
+      workspaceContext?.navigateToWorkspace(id)
+    } else {
+      workspaceContext?.navigateToNewWorkspace()
+    }
+  }, [workspaceContext])
+
+  // Previous chat ID for navigation after archive (local state)
+  const [previousChatId, setPreviousChatId] = useState<string | null>(null)
+  // Track previous chat ID when selectedChatId changes
+  const prevSelectedChatIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (prevSelectedChatIdRef.current && prevSelectedChatIdRef.current !== selectedChatId) {
+      setPreviousChatId(prevSelectedChatIdRef.current)
+    }
+    prevSelectedChatIdRef.current = selectedChatId
+  }, [selectedChatId])
+  // Selected draft ID (local state)
+  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null)
+  const loadingSubChats = useSessionStore((s) => s.loadingSessions)
   // Use ref instead of state to avoid re-renders on hover
   const isSidebarHoveredRef = useRef(false)
   const closeButtonRef = useRef<HTMLDivElement>(null)
@@ -1142,19 +1144,18 @@ export function AgentsSidebar({
   const [focusedChatIndex, setFocusedChatIndex] = useState<number>(-1) // -1 means no focus
   const hoveredChatIndexRef = useRef<number>(-1) // Track hovered chat for X hotkey - ref to avoid re-renders
 
-  // Global desktop/fullscreen state from atoms (initialized in AgentsLayout)
-  const isDesktop = useAtomValue(isDesktopAtom)
-  const isFullscreen = useAtomValue(isFullscreenAtom)
+  // Global desktop/fullscreen state from Zustand store (initialized in AgentsLayout)
+  const isDesktop = useUIStore((s) => s.isDesktop)
+  const isFullscreen = useUIStore((s) => s.isFullscreen)
 
-  // Multi-select state
-  const [selectedChatIds, setSelectedChatIds] = useAtom(
-    selectedAgentChatIdsAtom,
-  )
-  const isMultiSelectMode = useAtomValue(isAgentMultiSelectModeAtom)
-  const selectedChatsCount = useAtomValue(selectedAgentChatsCountAtom)
-  const toggleChatSelection = useSetAtom(toggleAgentChatSelectionAtom)
-  const selectAllChats = useSetAtom(selectAllAgentChatsAtom)
-  const clearChatSelection = useSetAtom(clearAgentChatSelectionAtom)
+  // Multi-select state from Zustand
+  const selectedChatIds = useUIStore((s) => s.selectedWorkspaceIds)
+  const setSelectedChatIds = useUIStore((s) => s.selectAllWorkspaces)
+  const isMultiSelectMode = useUIStore((s) => s.selectedWorkspaceIds.size > 0)
+  const selectedChatsCount = useUIStore((s) => s.selectedWorkspaceIds.size)
+  const toggleChatSelection = useUIStore((s) => s.toggleWorkspaceSelection)
+  const selectAllChats = useUIStore((s) => s.selectAllWorkspaces)
+  const clearChatSelection = useUIStore((s) => s.clearWorkspaceSelection)
 
   // Scroll gradient state for agents list
   const [showBottomGradient, setShowBottomGradient] = useState(false)
@@ -1164,11 +1165,13 @@ export function AgentsSidebar({
   // Multiple drafts state - uses event-based sync instead of polling
   const drafts = useNewChatDrafts()
 
-  // Read unseen changes from global atoms
-  const unseenChanges = useAtomValue(agentsUnseenChangesAtom)
-  const justCreatedIds = useAtomValue(justCreatedIdsAtom)
+  // Read unseen changes from Zustand store
+  const unseenChanges = useSessionStore((s) => s.unseenChanges)
+  const justCreatedIds = useSessionStore((s) => s.justCreatedIds)
 
-  const setShortcutsDialogOpen = useSetAtom(agentsShortcutsDialogOpenAtom)
+  const openDialog = useUIStore((s) => s.openDialog)
+  const closeDialog = useUIStore((s) => s.closeDialog)
+  const setShortcutsDialogOpen = (open: boolean) => open ? openDialog("shortcuts") : closeDialog("shortcuts")
 
   // Haptic feedback
   const { trigger: triggerHaptic } = useHaptic()
@@ -1195,17 +1198,19 @@ export function AgentsSidebar({
     null,
   )
 
-  const setSettingsDialogOpen = useSetAtom(agentsSettingsDialogOpenAtom)
-  const setSettingsActiveTab = useSetAtom(agentsSettingsDialogActiveTabAtom)
+  const openSettingsDialog = useUIStore((s) => s.openDialog)
+  const setSettingsDialogOpen = (open: boolean) => open ? openSettingsDialog("settings") : useUIStore.getState().closeDialog("settings")
+  const setSettingsActiveTab = useUIStore((s) => s.setSettingsTab)
   const { isLoaded: isAuthLoaded } = useCombinedAuth()
   const [showAuthDialog, setShowAuthDialog] = useState(false)
-  const setCreateTeamDialogOpen = useSetAtom(createTeamDialogOpenAtom)
+  // createTeamDialogOpen not in Zustand yet - keeping as local state if needed
+  const setCreateTeamDialogOpen = (_open: boolean) => {} // TODO: migrate if still used
 
-  // Debug mode for testing first-time user experience
-  const debugMode = useAtomValue(agentsDebugModeAtom)
+  // Debug mode from Zustand store
+  const debugMode = useUIStore((s) => s.debugMode)
 
-  // Desktop: use selectedProject instead of teams
-  const [selectedProject] = useAtom(selectedProjectAtom)
+  // Desktop: use selectedProject from Zustand store
+  const selectedProject = useUIStore((s) => s.selectedProject)
 
   // Fetch all chats (no project filter)
   const { data: agentChats } = trpc.chats.list.useQuery({})
@@ -1281,8 +1286,8 @@ export function AgentsSidebar({
   // Get utils outside of callbacks - hooks must be called at top level
   const utils = trpc.useUtils()
 
-  // Unified undo stack for workspaces and sub-chats (Jotai atom)
-  const [undoStack, setUndoStack] = useAtom(undoStackAtom)
+  // Unified undo stack for workspaces and sub-chats (local state)
+  const [undoStack, setUndoStack] = useState<UndoItem[]>([])
 
   // Restore chat mutation (for undo)
   const restoreChatMutation = trpc.chats.restore.useMutation({
@@ -1772,7 +1777,7 @@ export function AgentsSidebar({
           newSelection.add(chat.id)
         }
       }
-      setSelectedChatIds(newSelection)
+      setSelectedChatIds(Array.from(newSelection))
       return
     }
 

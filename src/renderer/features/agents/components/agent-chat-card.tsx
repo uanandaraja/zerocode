@@ -7,8 +7,7 @@ import {
   PlanIcon,
   AgentIcon,
 } from "../../../components/ui/canvas-icons"
-import { useAtomValue } from "jotai"
-import { agentsUnseenChangesAtom, lastChatModesAtom } from "../atoms"
+import { useSessionStore } from "../../../stores"
 
 interface AgentChatCardProps {
   chat: {
@@ -111,12 +110,15 @@ export function AgentChatCard({
   gitProvider,
   repoName,
 }: AgentChatCardProps) {
-  // Get status atoms
-  const unseenChanges = useAtomValue(agentsUnseenChangesAtom)
-  const lastChatModes = useAtomValue(lastChatModesAtom)
+  // Get status from stores
+  const unseenChanges = useSessionStore((s) => s.unseenChanges)
+  // Get session metadata for mode info
+  const allSessions = useSessionStore((s) => s.allSessions)
 
   const hasUnseenChanges = unseenChanges.has(chat.id)
-  const lastMode = lastChatModes.get(chat.id) || "agent"
+  // Find the session to get its mode, fallback to "agent"
+  const session = allSessions.find((s) => s.id === chat.id)
+  const lastMode = session?.mode || "agent"
   // isLoading is already derived from loadingSubChatsAtom (local tracking)
   const actualIsLoading = isLoading
 

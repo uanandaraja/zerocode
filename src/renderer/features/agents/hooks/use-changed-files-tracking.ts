@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useSetAtom } from "jotai"
-import { subChatFilesAtom, subChatToChatMapAtom, type SubChatFileChange } from "../atoms"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { useSessionStore, type SubChatFileChange } from "../../../stores"
 // import { REPO_ROOT_PATH } from "@/lib/codesandbox-constants"
 const REPO_ROOT_PATH = "/workspace" // Desktop mock
 
@@ -30,8 +29,8 @@ export function useChangedFilesTracking(
   isStreaming: boolean = false,
   chatId?: string,
 ) {
-  const setSubChatFiles = useSetAtom(subChatFilesAtom)
-  const setSubChatToChatMap = useSetAtom(subChatToChatMapAtom)
+  const setSubChatFiles = useSessionStore((s) => s.setSubChatFiles)
+  const setSubChatToChatMap = useSessionStore((s) => s.setSubChatToChatMap)
 
   // Helper to get display path (removes sandbox prefixes)
   const getDisplayPath = useCallback((filePath: string): string => {
@@ -183,23 +182,15 @@ export function useChangedFilesTracking(
     wasStreamingRef.current = isStreaming
   }, [isStreaming, calculateChangedFiles, messages.length])
 
-  // Update atom when changed files change
+  // Update store when changed files change
   useEffect(() => {
-    setSubChatFiles((prev) => {
-      const next = new Map(prev)
-      next.set(subChatId, changedFiles)
-      return next
-    })
+    setSubChatFiles(subChatId, changedFiles)
   }, [subChatId, changedFiles, setSubChatFiles])
 
   // Update subChatId -> chatId mapping for aggregation in workspace sidebar
   useEffect(() => {
     if (chatId) {
-      setSubChatToChatMap((prev) => {
-        const next = new Map(prev)
-        next.set(subChatId, chatId)
-        return next
-      })
+      setSubChatToChatMap(subChatId, chatId)
     }
   }, [subChatId, chatId, setSubChatToChatMap])
 

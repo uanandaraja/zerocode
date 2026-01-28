@@ -1,5 +1,4 @@
 import { memo, useState, useEffect, useMemo, useCallback } from "react"
-import { useSetAtom } from "jotai"
 import { useCodeTheme } from "../../lib/hooks/use-code-theme"
 import { highlightCode } from "../../lib/themes/shiki-theme-loader"
 import {
@@ -14,7 +13,7 @@ import {
   TooltipTrigger,
 } from "../../components/ui/tooltip"
 import { getToolStatus } from "./agent-tool-registry"
-import { agentsDiffSidebarOpenAtom, agentsFocusedDiffFileAtom } from "../../lib/atoms"
+import { useUIStore } from "../../stores"
 import { cn } from "../../lib/utils"
 import { FileCode2 } from "lucide-react"
 
@@ -196,9 +195,9 @@ export const AgentEditTool = memo(function AgentEditTool({
   const { isPending } = getToolStatus(part, chatStatus)
   const codeTheme = useCodeTheme()
 
-  // Atoms for opening diff sidebar and focusing on file
-  const setDiffSidebarOpen = useSetAtom(agentsDiffSidebarOpenAtom)
-  const setFocusedDiffFile = useSetAtom(agentsFocusedDiffFileAtom)
+  // Use UI store for opening diff sidebar and focusing on file
+  const setDiffSidebarOpen = useUIStore((state) => state.setDiffSidebarOpen)
+  const setFocusedDiffFile = useUIStore((state) => state.setFocusedDiffFile)
 
   // Determine mode: Write (create new file) vs Edit (modify existing)
   const isWriteMode = part.type === "tool-Write"

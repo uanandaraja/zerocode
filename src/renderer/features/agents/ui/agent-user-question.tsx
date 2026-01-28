@@ -4,7 +4,7 @@ import { memo, useState, useEffect, useCallback, useRef } from "react"
 import { ChevronUp, ChevronDown, CornerDownLeft } from "lucide-react"
 import { Button } from "../../../components/ui/button"
 import { cn } from "../../../lib/utils"
-import type { PendingUserQuestions } from "../atoms"
+import type { PendingUserQuestions } from "../../../stores"
 
 interface AgentUserQuestionProps {
   pendingQuestions: PendingUserQuestions

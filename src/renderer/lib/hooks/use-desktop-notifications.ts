@@ -1,18 +1,11 @@
 "use client"
 
-import { useEffect, useRef, useCallback } from "react"
-import { useAtom } from "jotai"
-import { atomWithStorage } from "jotai/utils"
+import { useEffect, useRef, useCallback, useState } from "react"
 import { isDesktopApp } from "../utils/platform"
 
-// Track pending notifications count for badge
-const pendingNotificationsAtom = atomWithStorage<number>(
-  "desktop-pending-notifications",
-  0,
-)
-
-// Track window focus state
-let isWindowFocused = true
+// Track window focus state - initialize from document.hasFocus() if available
+let isWindowFocused =
+  typeof document !== "undefined" ? document.hasFocus() : true
 
 /**
  * Hook to manage desktop notifications and badge count
@@ -21,14 +14,15 @@ let isWindowFocused = true
  * - Clears badge when window regains focus
  */
 export function useDesktopNotifications() {
-  const [pendingCount, setPendingCount] = useAtom(pendingNotificationsAtom)
+  // Use local state for pending count - this is transient UI state
+  const [pendingCount, setPendingCount] = useState<number>(0)
   const isInitialized = useRef(false)
 
   // Subscribe to window focus changes
   useEffect(() => {
     if (!isDesktopApp() || typeof window === "undefined") return
 
-    // Initialize focus state
+    // Initialize focus state from document
     isWindowFocused = document.hasFocus()
 
     const handleFocus = () => {
@@ -42,11 +36,21 @@ export function useDesktopNotifications() {
       isWindowFocused = false
     }
 
-    // Use both window events and Electron API
+    // Use both window events and Electron API for redundancy
     window.addEventListener("focus", handleFocus)
     window.addEventListener("blur", handleBlur)
 
-    // Also subscribe to Electron focus events
+    // Also use visibility change as a fallback (catches tab switches, etc.)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && document.hasFocus()) {
+        handleFocus()
+      } else if (document.visibilityState === "hidden") {
+        handleBlur()
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    // Subscribe to Electron focus events (most reliable for Electron)
     const unsubscribe = window.desktopApi?.onFocusChange?.((focused) => {
       if (focused) {
         handleFocus()
@@ -60,6 +64,7 @@ export function useDesktopNotifications() {
     return () => {
       window.removeEventListener("focus", handleFocus)
       window.removeEventListener("blur", handleBlur)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
       unsubscribe?.()
     }
   }, [setPendingCount])
@@ -127,6 +132,21 @@ export function showAgentNotification(agentName: string) {
     window.desktopApi?.showNotification({
       title: "Agent finished",
       body: `${agentName} completed the task`,
+    })
+  }
+}
+
+/**
+ * Standalone function to show notification when agent asks a question
+ */
+export function showAgentQuestionNotification(questionHeader?: string) {
+  if (!isDesktopApp() || typeof window === "undefined") return
+
+  // Only notify if window is not focused
+  if (!document.hasFocus()) {
+    window.desktopApi?.showNotification({
+      title: "Agent needs input",
+      body: questionHeader || "Waiting for your response",
     })
   }
 }

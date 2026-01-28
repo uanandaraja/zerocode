@@ -14,9 +14,7 @@ import {
   type ReactNode,
   type ErrorInfo,
 } from "react"
-import { useAtom, useAtomValue, useSetAtom } from "jotai"
-import { atomWithStorage } from "jotai/utils"
-import { agentsFocusedDiffFileAtom, filteredDiffFilesAtom } from "../atoms"
+import { useUIStore } from "../../../stores"
 import { PatchDiff } from "@pierre/diffs/react"
 import { useTheme } from "next-themes"
 
@@ -153,10 +151,8 @@ export type ParsedDiffFile = {
   isValid?: boolean // Whether the diff format is valid/complete
 }
 
-export const diffViewModeAtom = atomWithStorage<DiffModeEnum>(
-  "agents-diff:view-mode",
-  DiffModeEnum.Unified,
-)
+// Note: diffViewMode is kept as local state with localStorage persistence
+// since it's a user preference that doesn't need to be in global store
 
 // Validate if a diff hunk has valid structure
 // This is a lenient validator - only reject clearly malformed diffs
@@ -618,7 +614,19 @@ export const AgentDiffView = forwardRef<AgentDiffViewRef, AgentDiffViewProps>(
     const [fullExpandedByFileKey, setFullExpandedByFileKey] = useState<
       Record<string, boolean>
     >({})
-    const [diffMode, setDiffMode] = useAtom(diffViewModeAtom)
+    // Local state with localStorage persistence for diff view mode
+    const [diffMode, setDiffMode] = useState<DiffModeEnum>(() => {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("agents-diff:view-mode")
+        if (stored === "split") return DiffModeEnum.Split
+      }
+      return DiffModeEnum.Unified
+    })
+    
+    // Persist to localStorage on change
+    useEffect(() => {
+      localStorage.setItem("agents-diff:view-mode", diffMode)
+    }, [diffMode])
 
     // Pre-fetched file contents for expand functionality
     // Use prefetched data if available, otherwise start empty
@@ -637,9 +645,9 @@ export const AgentDiffView = forwardRef<AgentDiffViewRef, AgentDiffViewProps>(
       }
     }, [prefetchedFileContents])
 
-    // Focused file for scroll-to functionality
-    const focusedDiffFile = useAtomValue(agentsFocusedDiffFileAtom)
-    const setFocusedDiffFile = useSetAtom(agentsFocusedDiffFileAtom)
+    // Focused file for scroll-to functionality - from UI store
+    const focusedDiffFile = useUIStore((state) => state.focusedDiffFile)
+    const setFocusedDiffFile = useUIStore((state) => state.setFocusedDiffFile)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
 
     // Height for collapsed header (file name + stats)
@@ -752,9 +760,9 @@ export const AgentDiffView = forwardRef<AgentDiffViewRef, AgentDiffViewProps>(
 
     const isLight = isHydrated ? resolvedTheme !== "dark" : true
 
-    // Read filter for sub-chat specific file filtering
-    const filteredDiffFiles = useAtomValue(filteredDiffFilesAtom)
-    const setFilteredDiffFiles = useSetAtom(filteredDiffFilesAtom)
+    // Read filter for sub-chat specific file filtering - from UI store
+    const filteredDiffFiles = useUIStore((state) => state.filteredDiffFiles)
+    const setFilteredDiffFiles = useUIStore((state) => state.setFilteredDiffFiles)
 
     // Clear filter when component unmounts
     useEffect(() => {
@@ -787,7 +795,7 @@ export const AgentDiffView = forwardRef<AgentDiffViewRef, AgentDiffViewProps>(
         const filePath = file.newPath || file.oldPath
         // Match by exact path or by path suffix (to handle sandbox path prefixes)
         return filteredDiffFiles.some(
-          (filterPath) =>
+          (filterPath: string) =>
             filePath === filterPath ||
             filePath.endsWith(filterPath) ||
             filterPath.endsWith(filePath),

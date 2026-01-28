@@ -2,7 +2,6 @@
 
 import { memo, useCallback, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { useAtom, useSetAtom } from "jotai"
 import { ChevronDown } from "lucide-react"
 
 import { Button } from "../../../components/ui/button"
@@ -26,7 +25,7 @@ import {
   PromptInputContextItems,
 } from "../../../components/ui/prompt-input"
 import { cn } from "../../../lib/utils"
-import { isPlanModeAtom } from "../atoms"
+import { useUIStore } from "../../../stores"
 import { AgentsSlashCommand, COMMAND_PROMPTS, type SlashCommandOption } from "../commands"
 import { AgentSendButton } from "../components/agent-send-button"
 import {
@@ -43,7 +42,7 @@ import {
   saveSubChatDraft,
   clearSubChatDraft,
 } from "../lib/drafts"
-import { type SubChatFileChange } from "../atoms"
+import { type SubChatFileChange } from "../../../stores"
 
 export interface ChatInputAreaProps {
   // Editor ref - passed from parent for external access
@@ -240,8 +239,9 @@ export const ChatInputArea = memo(function ChatInputArea({
   const tooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasShownTooltipRef = useRef(false)
 
-  // Plan mode - global atom
-  const [isPlanMode, setIsPlanMode] = useAtom(isPlanModeAtom)
+  // Plan mode - Zustand store
+  const isPlanMode = useUIStore((s) => s.isPlanMode)
+  const setIsPlanMode = useUIStore((s) => s.setIsPlanMode)
 
   // Refs for draft saving
   const currentSubChatIdRef = useRef<string>(subChatId)
@@ -499,7 +499,7 @@ export const ChatInputArea = memo(function ChatInputArea({
                   onCloseSlashTrigger={handleCloseSlashTrigger}
                   onContentChange={handleContentChange}
                   onSubmit={onSend}
-                  onShiftTab={() => setIsPlanMode((prev) => !prev)}
+                  onShiftTab={() => setIsPlanMode(!isPlanMode)}
                   placeholder="Plan, @ for context, / for commands"
                   className={cn(
                     "bg-transparent max-h-[200px] overflow-y-auto p-1",

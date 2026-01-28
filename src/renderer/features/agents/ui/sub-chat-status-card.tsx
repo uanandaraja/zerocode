@@ -1,7 +1,6 @@
 "use client"
 
 import { memo, useState, useMemo, useEffect } from "react"
-import { useSetAtom, useAtom } from "jotai"
 import { ChevronUp } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
 import { Button } from "../../../components/ui/button"
@@ -9,12 +8,7 @@ import { cn } from "../../../lib/utils"
 import { trpc } from "../../../lib/trpc"
 import { useFileChangeListener } from "../../../lib/hooks/use-file-change-listener"
 import { getFileIconByExtension } from "../mentions/agents-file-mention"
-import {
-  diffSidebarOpenAtomFamily,
-  agentsFocusedDiffFileAtom,
-  filteredDiffFilesAtom,
-  type SubChatFileChange,
-} from "../atoms"
+import { useUIStore, useSessionStore, type SubChatFileChange } from "../../../stores"
 
 // Animated dots component that cycles through ., .., ...
 function AnimatedDots() {
@@ -48,14 +42,11 @@ export const SubChatStatusCard = memo(function SubChatStatusCard({
   onStop,
 }: SubChatStatusCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
-  // Use per-chat atom family instead of legacy global atom
-  const diffSidebarAtom = useMemo(
-    () => diffSidebarOpenAtomFamily(chatId),
-    [chatId],
-  )
-  const [, setDiffSidebarOpen] = useAtom(diffSidebarAtom)
-  const setFilteredDiffFiles = useSetAtom(filteredDiffFilesAtom)
-  const setFocusedDiffFile = useSetAtom(agentsFocusedDiffFileAtom)
+  
+  // Use Zustand stores instead of Jotai atoms
+  const setDiffSidebarOpen = useSessionStore((state) => state.setDiffSidebarOpen)
+  const setFilteredDiffFiles = useUIStore((state) => state.setFilteredDiffFiles)
+  const setFocusedDiffFile = useUIStore((state) => state.setFocusedDiffFile)
 
   // Listen for file changes from Claude Write/Edit tools
   useFileChangeListener(worktreePath)
@@ -122,7 +113,7 @@ export const SubChatStatusCard = memo(function SubChatStatusCard({
     // Use displayPath (relative path) to match git diff paths
     const filePaths = uncommittedFiles.map((f) => f.displayPath)
     setFilteredDiffFiles(filePaths.length > 0 ? filePaths : null)
-    setDiffSidebarOpen(true)
+    setDiffSidebarOpen(chatId, true)
   }
 
   return (
@@ -149,7 +140,7 @@ export const SubChatStatusCard = memo(function SubChatStatusCard({
                   // Set focus on this specific file
                   setFocusedDiffFile(file.displayPath)
                   // Open diff sidebar
-                  setDiffSidebarOpen(true)
+                  setDiffSidebarOpen(chatId, true)
                 }
 
                 const handleKeyDown = (e: React.KeyboardEvent) => {

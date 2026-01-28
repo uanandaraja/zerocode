@@ -4,10 +4,8 @@ import type { FitAddon } from "@xterm/addon-fit"
 import type { SearchAddon } from "@xterm/addon-search"
 import type { SerializeAddon } from "@xterm/addon-serialize"
 import { useTheme } from "next-themes"
-import { useSetAtom, useAtomValue } from "jotai"
 import { trpc } from "@/lib/trpc"
-import { terminalCwdAtom } from "./atoms"
-import { fullThemeDataAtom } from "@/lib/atoms"
+import { useUIStore } from "../../stores"
 import {
   createTerminalInstance,
   getDefaultTerminalBg,
@@ -42,21 +40,21 @@ export function Terminal({
   const commandBufferRef = useRef("")
 
   const [isSearchOpen, setIsSearchOpen] = useState(false)
-  const [terminalCwd, setTerminalCwd] = useState<string | null>(
+  const [localTerminalCwd, setLocalTerminalCwd] = useState<string | null>(
     initialCwd || cwd,
   )
-  const setGlobalCwds = useSetAtom(terminalCwdAtom)
+  const setGlobalTerminalCwd = useUIStore((s) => s.setTerminalCwd)
 
   // Theme detection
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
   
   // VS Code theme data (if a full theme is selected)
-  const fullThemeData = useAtomValue(fullThemeDataAtom)
+  const fullThemeData = useUIStore((s) => s.fullThemeData)
 
   // Ref for terminalCwd to avoid effect re-runs when cwd changes
-  const terminalCwdRef = useRef(terminalCwd)
-  terminalCwdRef.current = terminalCwd
+  const terminalCwdRef = useRef(localTerminalCwd)
+  terminalCwdRef.current = localTerminalCwd
 
   // Ref for paneId to use in callbacks
   const paneIdRef = useRef(paneId)
@@ -86,15 +84,12 @@ export function Terminal({
     (data: string) => {
       const parsedCwd = parseCwd(data)
       if (parsedCwd !== null) {
-        setTerminalCwd(parsedCwd)
-        // Also update global atom for the tabs to show
-        setGlobalCwds((prev) => ({
-          ...prev,
-          [paneIdRef.current]: parsedCwd,
-        }))
+        setLocalTerminalCwd(parsedCwd)
+        // Also update global store for the tabs to show
+        setGlobalTerminalCwd(paneIdRef.current, parsedCwd)
       }
     },
-    [setGlobalCwds],
+    [setGlobalTerminalCwd],
   )
 
   const updateCwdRef = useRef(updateCwdFromData)

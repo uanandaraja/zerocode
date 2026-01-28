@@ -1,6 +1,5 @@
 "use client"
 
-import { useAtom } from "jotai"
 import { ChevronRight, Loader2 } from "lucide-react"
 import { memo, useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "../../../components/ui/button"
@@ -15,7 +14,7 @@ import {
   TooltipTrigger,
 } from "../../../components/ui/tooltip"
 import { OriginalMCPIcon } from "../../../components/ui/icons"
-import { sessionInfoAtom, type MCPServerStatus } from "../../../lib/atoms"
+import { useUIStore, type MCPServerStatus, type SessionInfo } from "../../../stores"
 import { cn } from "../../../lib/utils"
 import { trpc } from "../../../lib/trpc"
 
@@ -35,7 +34,8 @@ interface McpServersIndicatorProps {
 export const McpServersIndicator = memo(function McpServersIndicator({
   projectPath,
 }: McpServersIndicatorProps) {
-  const [sessionInfo, setSessionInfo] = useAtom(sessionInfoAtom)
+  const sessionInfo = useUIStore((state) => state.sessionInfo)
+  const setSessionInfo = useUIStore((state) => state.setSessionInfo)
 
   // Fetch MCP config on mount if we have projectPath and no session info yet
   const { data: mcpConfig } = trpc.claude.getMcpConfig.useQuery(
@@ -49,17 +49,18 @@ export const McpServersIndicator = memo(function McpServersIndicator({
   // Update sessionInfo with MCP config if we don't have it yet
   useEffect(() => {
     if (mcpConfig?.mcpServers?.length && !sessionInfo?.mcpServers?.length) {
-      setSessionInfo((prev) => ({
-        tools: prev?.tools || [],
-        mcpServers: mcpConfig.mcpServers.map((s) => ({
+      const newSessionInfo: SessionInfo = {
+        tools: sessionInfo?.tools || [],
+        mcpServers: mcpConfig.mcpServers.map((s: { name: string; status: MCPServerStatus }) => ({
           name: s.name,
           status: s.status,
         })),
-        plugins: prev?.plugins || [],
-        skills: prev?.skills || [],
-      }))
+        plugins: sessionInfo?.plugins || [],
+        skills: sessionInfo?.skills || [],
+      }
+      setSessionInfo(newSessionInfo)
     }
-  }, [mcpConfig, sessionInfo?.mcpServers?.length, setSessionInfo])
+  }, [mcpConfig, sessionInfo, setSessionInfo])
   const [isOpen, setIsOpen] = useState(false)
   const [expandedServers, setExpandedServers] = useState<Set<string>>(new Set())
   const [focusedIndex, setFocusedIndex] = useState(-1)

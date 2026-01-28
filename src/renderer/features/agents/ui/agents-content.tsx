@@ -1,32 +1,15 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import { useAtom, useAtomValue, useSetAtom } from "jotai"
-// import { useSearchParams, useRouter } from "next/navigation" // Desktop doesn't use next/navigation
-// Desktop: mock Next.js navigation hooks
-const useSearchParams = () => ({ get: (_key?: string) => null })
-const useRouter = () => ({ push: (_url?: string) => {}, replace: (_url?: string, _opts?: unknown) => {} })
+import { useEffect, useMemo, useRef, useState, useCallback } from "react"
 // Desktop: mock Clerk hooks
 const useUser = () => ({ user: null })
 const useClerk = () => ({ signOut: (_opts?: unknown) => {} })
-import {
-  selectedAgentChatIdAtom,
-  previousAgentChatIdAtom,
-  agentsMobileViewModeAtom,
-  agentsPreviewSidebarOpenAtom,
-  agentsSidebarOpenAtom,
-  agentsSubChatsSidebarModeAtom,
-  agentsSubChatsSidebarWidthAtom,
-  zenModeAtom,
-} from "../atoms"
-import {
-  selectedTeamIdAtom,
-  agentsQuickSwitchOpenAtom,
-  agentsQuickSwitchSelectedIndexAtom,
-  subChatsQuickSwitchOpenAtom,
-  subChatsQuickSwitchSelectedIndexAtom,
-  ctrlTabTargetAtom,
-} from "../../../lib/atoms"
+
+// WorkspaceContext for URL-based navigation
+import { useOptionalWorkspaceContext } from "../../../contexts/WorkspaceContext"
+
+// Zustand stores
+import { useUIStore } from "../../../stores"
 import { NewChatForm } from "../main/new-chat-form"
 import { ChatView } from "../main/active-chat"
 import { api } from "../../../lib/api-bridge"
@@ -36,7 +19,7 @@ import { AgentsSidebar } from "../../sidebar/agents-sidebar"
 import { AgentsSubChatsSidebar } from "../../sidebar/agents-subchats-sidebar"
 import { AgentPreview } from "./agent-preview"
 import { AgentDiffView } from "./agent-diff-view"
-import { TerminalSidebar, terminalSidebarOpenAtom } from "../../terminal"
+import { TerminalSidebar } from "../../terminal"
 import {
   useAgentSubChatStore,
   type SubChatMeta,
@@ -58,27 +41,38 @@ const useIsAdmin = () => false
 
 // Main Component
 export function AgentsContent() {
-  const [selectedChatId, setSelectedChatId] = useAtom(selectedAgentChatIdAtom)
-  const [selectedTeamId] = useAtom(selectedTeamIdAtom)
-  const [sidebarOpen, setSidebarOpen] = useAtom(agentsSidebarOpenAtom)
-  const [previewSidebarOpen, setPreviewSidebarOpen] = useAtom(
-    agentsPreviewSidebarOpenAtom,
-  )
-  const [mobileViewMode, setMobileViewMode] = useAtom(agentsMobileViewModeAtom)
-  const [subChatsSidebarMode, setSubChatsSidebarMode] = useAtom(
-    agentsSubChatsSidebarModeAtom,
-  )
-  const setTerminalSidebarOpen = useSetAtom(terminalSidebarOpenAtom)
-  const isZenMode = useAtomValue(zenModeAtom)
+  // Get workspace/session from URL via context (replaces selectedAgentChatIdAtom)
+  const workspaceContext = useOptionalWorkspaceContext()
+  const selectedChatId = workspaceContext?.workspaceId ?? null
+  
+  // Navigation helper using router context
+  const setSelectedChatId = useCallback((id: string | null) => {
+    if (id) {
+      workspaceContext?.navigateToWorkspace(id)
+    } else {
+      workspaceContext?.navigateToNewWorkspace()
+    }
+  }, [workspaceContext])
+
+  // UI Store state
+  const selectedTeamId = useUIStore((state) => state.selectedTeamId)
+  const sidebarOpen = useUIStore((state) => state.sidebar.open)
+  const setSidebarOpen = useUIStore((state) => state.setSidebarOpen)
+  const previewSidebarOpen = useUIStore((state) => state.previewSidebar.open)
+  const setPreviewSidebarOpen = useUIStore((state) => state.setPreviewSidebarOpen)
+  const mobileViewMode = useUIStore((state) => state.mobileViewMode)
+  const setMobileViewMode = useUIStore((state) => state.setMobileViewMode)
+  const subChatsSidebarMode = useUIStore((state) => state.sessionsSidebarMode)
+  const setSubChatsSidebarMode = useUIStore((state) => state.setSessionsSidebarMode)
+  const setTerminalSidebarOpen = useUIStore((state) => state.setTerminalSidebarOpen)
+  const isZenMode = useUIStore((state) => state.zenMode)
+  const subChatsSidebarWidth = useUIStore((state) => state.sessionsSidebarWidth)
+  const setSubChatsSidebarWidth = useUIStore((state) => state.setSessionsSidebarWidth)
 
   const hasOpenedSubChatsSidebar = useRef(false)
   const wasSubChatsSidebarOpen = useRef(false)
   const [shouldAnimateSubChatsSidebar, setShouldAnimateSubChatsSidebar] =
     useState(subChatsSidebarMode !== "sidebar")
-  const searchParams = useSearchParams()
-  const router = useRouter()
-  const isInitialized = useRef(false)
-  const isFirstRenderRef = useRef(true) // Skip URL sync on first render to avoid race condition
   const isNavigatingRef = useRef(false)
   const newChatFormKeyRef = useRef(0)
   const isMobile = useIsMobile()
@@ -89,12 +83,16 @@ export function AgentsContent() {
   const isAdmin = useIsAdmin()
 
   // Quick-switch dialog state - Agents (Opt+Ctrl+Tab)
-  const [quickSwitchOpen, setQuickSwitchOpen] = useAtom(
-    agentsQuickSwitchOpenAtom,
-  )
-  const [quickSwitchSelectedIndex, setQuickSwitchSelectedIndex] = useAtom(
-    agentsQuickSwitchSelectedIndexAtom,
-  )
+  const quickSwitchOpen = useUIStore((state) => state.dialogs.quickSwitch)
+  const setQuickSwitchOpen = useCallback((open: boolean) => {
+    if (open) {
+      useUIStore.getState().openDialog("quickSwitch")
+    } else {
+      useUIStore.getState().closeDialog("quickSwitch")
+    }
+  }, [])
+  const quickSwitchSelectedIndex = useUIStore((state) => state.dialogs.quickSwitchIndex)
+  const setQuickSwitchSelectedIndex = useUIStore((state) => state.setQuickSwitchIndex)
   const holdTimerRef = useRef<NodeJS.Timeout | null>(null)
   const modifierKeysHeldRef = useRef(false)
   const wasShiftPressedRef = useRef(false)
@@ -102,14 +100,19 @@ export function AgentsContent() {
   const frozenRecentChatsRef = useRef<typeof agentChats>([]) // Frozen snapshot for dialog
 
   // Ctrl+Tab target preference
-  const ctrlTabTarget = useAtomValue(ctrlTabTargetAtom)
+  const ctrlTabTarget = useUIStore((state) => state.preferences.ctrlTabTarget)
 
   // Quick-switch dialog state - Sub-chats (Ctrl+Tab)
-  const [subChatQuickSwitchOpen, setSubChatQuickSwitchOpen] = useAtom(
-    subChatsQuickSwitchOpenAtom,
-  )
-  const [subChatQuickSwitchSelectedIndex, setSubChatQuickSwitchSelectedIndex] =
-    useAtom(subChatsQuickSwitchSelectedIndexAtom)
+  const subChatQuickSwitchOpen = useUIStore((state) => state.dialogs.quickSwitchSessions)
+  const setSubChatQuickSwitchOpen = useCallback((open: boolean) => {
+    if (open) {
+      useUIStore.getState().openDialog("quickSwitchSessions")
+    } else {
+      useUIStore.getState().closeDialog("quickSwitchSessions")
+    }
+  }, [])
+  const subChatQuickSwitchSelectedIndex = useUIStore((state) => state.dialogs.quickSwitchSessionsIndex)
+  const setSubChatQuickSwitchSelectedIndex = useUIStore((state) => state.setQuickSwitchSessionsIndex)
   const subChatHoldTimerRef = useRef<NodeJS.Timeout | null>(null)
   const subChatModifierKeysHeldRef = useRef(false)
   const subChatWasShiftPressedRef = useRef(false)
@@ -159,18 +162,18 @@ export function AgentsContent() {
     { enabled: !!selectedChatId },
   )
 
-  // Track previous chat ID for navigation after archive
-  const [previousChatId, setPreviousChatId] = useAtom(previousAgentChatIdAtom)
+  // Track previous chat ID for navigation after archive (local ref)
+  const previousChatIdRef = useRef<string | null>(null)
   const prevSelectedChatIdRef = useRef<string | null>(null)
 
   // Update previousChatId when selectedChatId changes
   useEffect(() => {
     // Only update if we're switching from one chat to another
     if (prevSelectedChatIdRef.current && prevSelectedChatIdRef.current !== selectedChatId) {
-      setPreviousChatId(prevSelectedChatIdRef.current)
+      previousChatIdRef.current = prevSelectedChatIdRef.current
     }
     prevSelectedChatIdRef.current = selectedChatId
-  }, [selectedChatId, setPreviousChatId])
+  }, [selectedChatId])
 
   // Note: Archive mutations moved to AgentsSidebar to share undo stack with Cmd+Z
 
@@ -179,40 +182,14 @@ export function AgentsContent() {
     setIsHydrated(true)
   }, [])
 
-  // On mount: read URL → set atom
+  // Increment NewChatForm key when navigating away from a chat (for focus reset)
+  const prevSelectedChatRef = useRef(selectedChatId)
   useEffect(() => {
-    if (isInitialized.current) return
-    isInitialized.current = true
-
-    const chatIdFromUrl = searchParams.get("chat")
-    if (chatIdFromUrl) {
-      setSelectedChatId(chatIdFromUrl)
+    if (prevSelectedChatRef.current && !selectedChatId) {
+      newChatFormKeyRef.current += 1
     }
-  }, [searchParams, setSelectedChatId])
-
-  // When atom changes: update URL and increment NewChatForm key when returning to new chat view
-  useEffect(() => {
-    // Skip the first render - let the URL read effect set the initial value first
-    // This prevents a race condition where this effect would clear the chat param
-    // before the atom has been updated from the URL
-    if (isFirstRenderRef.current) {
-      isFirstRenderRef.current = false
-      return
-    }
-
-    const currentChatId = searchParams.get("chat")
-    if (selectedChatId !== currentChatId) {
-      const url = new URL(window.location.href)
-      if (selectedChatId) {
-        url.searchParams.set("chat", selectedChatId)
-      } else {
-        url.searchParams.delete("chat")
-        // Increment key to force NewChatForm remount and trigger focus
-        newChatFormKeyRef.current += 1
-      }
-      router.replace(url.pathname + url.search, { scroll: false })
-    }
-  }, [selectedChatId, searchParams, router, quickSwitchOpen])
+    prevSelectedChatRef.current = selectedChatId
+  }, [selectedChatId])
 
   // Auto-close sidebars on mobile devices
   useEffect(() => {
@@ -240,7 +217,7 @@ export function AgentsContent() {
   }, [isMobile, selectedChatId, mobileViewMode, setMobileViewMode])
 
   // On mobile: when in terminal mode, sync with terminal sidebar close
-  const terminalSidebarOpen = useAtomValue(terminalSidebarOpenAtom)
+  const terminalSidebarOpen = useUIStore((state) => state.terminalSidebar.open)
   useEffect(() => {
     // If terminal sidebar closed while in terminal mode, go back to chat
     if (isMobile && mobileViewMode === "terminal" && !terminalSidebarOpen) {
@@ -524,9 +501,9 @@ export function AgentsContent() {
       const isOptCtrlTab =
         e.altKey && e.ctrlKey && e.key === "Tab" && !e.metaKey
 
-      // Agent switch: Opt+Ctrl+Tab by default, or Ctrl+Tab when ctrlTabTarget is "agents"
+      // Agent switch: Opt+Ctrl+Tab by default, or Ctrl+Tab when ctrlTabTarget is "sessions"
       const isAgentSwitchShortcut =
-        ctrlTabTarget === "agents" ? isCtrlTabOnly : isOptCtrlTab
+        ctrlTabTarget === "sessions" ? isCtrlTabOnly : isOptCtrlTab
 
       if (isAgentSwitchShortcut) {
         e.preventDefault()
@@ -628,10 +605,10 @@ export function AgentsContent() {
       }
 
       // When modifier key is released
-      // For agents mode (Ctrl+Tab): react to Control release
+      // For sessions mode (Ctrl+Tab): react to Control release
       // For workspaces mode (Opt+Ctrl+Tab): react to Alt or Control release
       const isRelevantKeyRelease =
-        ctrlTabTarget === "agents"
+        ctrlTabTarget === "sessions"
           ? e.key === "Control"
           : e.key === "Alt" || e.key === "Control"
 
@@ -881,7 +858,8 @@ export function AgentsContent() {
             setShouldAnimateSubChatsSidebar(true)
             setSubChatsSidebarMode("tabs")
           }}
-          widthAtom={agentsSubChatsSidebarWidthAtom}
+          width={subChatsSidebarWidth}
+          setWidth={setSubChatsSidebarWidth}
           minWidth={160}
           maxWidth={300}
           side="left"
@@ -897,7 +875,7 @@ export function AgentsContent() {
             }}
             isMobile={isMobile}
             isSidebarOpen={sidebarOpen}
-            onBackToChats={() => setSidebarOpen((prev) => !prev)}
+            onBackToChats={() => setSidebarOpen(!sidebarOpen)}
             isLoading={isLoadingSubChats}
             agentName={chatData?.name ?? undefined}
           />
@@ -914,7 +892,7 @@ export function AgentsContent() {
                 key={selectedChatId}
                 chatId={selectedChatId}
                 isSidebarOpen={sidebarOpen}
-                onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+                onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
                 selectedTeamName={selectedTeam?.name}
                 selectedTeamImageUrl={selectedTeam?.image_url}
               />

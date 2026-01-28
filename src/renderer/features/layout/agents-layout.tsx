@@ -1,22 +1,13 @@
-import { useCallback, useEffect, useState, useMemo } from "react"
-import { useAtom, useAtomValue, useSetAtom } from "jotai"
+import { useCallback, useEffect, useMemo } from "react"
 import { isDesktopApp } from "../../lib/utils/platform"
 import { useIsMobile } from "../../lib/hooks/use-mobile"
 
-import {
-  agentsSidebarOpenAtom,
-  agentsSidebarWidthAtom,
-  agentsSettingsDialogOpenAtom,
-  agentsSettingsDialogActiveTabAtom,
-  agentsShortcutsDialogOpenAtom,
-  isDesktopAtom,
-  isFullscreenAtom,
-} from "../../lib/atoms"
-import {
-  selectedAgentChatIdAtom,
-  selectedProjectAtom,
-  zenModeAtom,
-} from "../agents/atoms"
+// New Zustand stores
+import { useUIStore, useSessionStore } from "../../stores"
+
+// Context for URL-based navigation
+import { useOptionalWorkspaceContext } from "../../contexts/WorkspaceContext"
+
 import { trpc } from "../../lib/trpc"
 import { useAgentsHotkeys } from "../agents/lib/agents-hotkeys-manager"
 import { AgentsSettingsDialog } from "../../components/dialogs/agents-settings-dialog"
@@ -27,7 +18,6 @@ import { AgentsSidebar } from "../sidebar/agents-sidebar"
 import { AgentsContent } from "../agents/ui/agents-content"
 import { UpdateBanner } from "../../components/update-banner"
 import { useUpdateChecker } from "../../lib/hooks/use-update-checker"
-import { useAgentSubChatStore } from "../../lib/stores/sub-chat-store"
 
 // ============================================================================
 // Constants
@@ -43,12 +33,40 @@ const SIDEBAR_CLOSE_HOTKEY = "⌘\\"
 // ============================================================================
 
 export function AgentsLayout() {
-  // No useHydrateAtoms - desktop doesn't need SSR, atomWithStorage handles persistence
   const isMobile = useIsMobile()
 
-  // Global desktop/fullscreen state - initialized here at root level
-  const [isDesktop, setIsDesktop] = useAtom(isDesktopAtom)
-  const [, setIsFullscreen] = useAtom(isFullscreenAtom)
+  // Get state and actions from Zustand stores
+  const isDesktop = useUIStore((s) => s.isDesktop)
+  const setIsDesktop = useUIStore((s) => s.setIsDesktop)
+  const setIsFullscreen = useUIStore((s) => s.setIsFullscreen)
+  
+  const sidebarOpen = useUIStore((s) => s.sidebar.open)
+  const setSidebarOpen = useUIStore((s) => s.setSidebarOpen)
+  const sidebarWidth = useUIStore((s) => s.sidebar.width)
+  const setSidebarWidth = useUIStore((s) => s.setSidebarWidth)
+  
+  const settingsOpen = useUIStore((s) => s.dialogs.settings)
+  const setSettingsOpen = (open: boolean) => open 
+    ? useUIStore.getState().openDialog("settings")
+    : useUIStore.getState().closeDialog("settings")
+  const setSettingsActiveTab = useUIStore((s) => s.setSettingsTab)
+  
+  const shortcutsOpen = useUIStore((s) => s.dialogs.shortcuts)
+  const setShortcutsOpen = (open: boolean) => open
+    ? useUIStore.getState().openDialog("shortcuts")
+    : useUIStore.getState().closeDialog("shortcuts")
+  
+  const selectedProject = useUIStore((s) => s.selectedProject)
+  const setSelectedProject = useUIStore((s) => s.setSelectedProject)
+  
+  const isZenMode = useUIStore((s) => s.zenMode)
+  const setIsZenMode = useUIStore((s) => s.setZenMode)
+
+  // Get workspace context from router (will be null on index page)
+  const workspaceContext = useOptionalWorkspaceContext()
+  
+  // Selected workspace ID comes from URL via WorkspaceContext
+  const selectedChatId = workspaceContext?.workspaceId ?? null
 
   // Initialize isDesktop on mount
   useEffect(() => {
@@ -84,26 +102,15 @@ export function AgentsLayout() {
   // Check for updates on mount and periodically
   useUpdateChecker()
 
-  const [sidebarOpen, setSidebarOpen] = useAtom(agentsSidebarOpenAtom)
-  const [sidebarWidth, setSidebarWidth] = useAtom(agentsSidebarWidthAtom)
-  const [settingsOpen, setSettingsOpen] = useAtom(agentsSettingsDialogOpenAtom)
-  const setSettingsActiveTab = useSetAtom(agentsSettingsDialogActiveTabAtom)
-  const [shortcutsOpen, setShortcutsOpen] = useAtom(
-    agentsShortcutsDialogOpenAtom,
-  )
-  const [selectedChatId, setSelectedChatId] = useAtom(selectedAgentChatIdAtom)
-  const [selectedProject, setSelectedProject] = useAtom(selectedProjectAtom)
-  const [isZenMode, setIsZenMode] = useAtom(zenModeAtom)
-
   // Fetch projects to validate selectedProject exists
   const { data: projects, isLoading: isLoadingProjects } =
     trpc.projects.list.useQuery()
 
   // Validated project - only valid if exists in DB
-  // While loading, trust localStorage value to prevent clearing on app restart
+  // While loading, trust stored value to prevent clearing on app restart
   const validatedProject = useMemo(() => {
     if (!selectedProject) return null
-    // While loading, trust localStorage value to prevent flicker and clearing
+    // While loading, trust stored value to prevent flicker and clearing
     if (isLoadingProjects) return selectedProject
     // After loading, validate against DB
     if (!projects) return null
@@ -144,9 +151,6 @@ export function AgentsLayout() {
       window.desktopApi.setTrafficLightVisibility(false)
     }
   }, [sidebarOpen, isDesktop])
-  const setChatId = useAgentSubChatStore((state) => state.setChatId)
-
-
 
   // Auto-open sidebar when project is selected, close when no project
   // Only act after projects have loaded to avoid closing sidebar during initial load
@@ -162,19 +166,11 @@ export function AgentsLayout() {
 
   // Handle sign out / clear data
   const handleSignOut = useCallback(() => {
-    // Clear selected project and chat
+    // Clear selected project
     setSelectedProject(null)
-    setSelectedChatId(null)
-  }, [setSelectedProject, setSelectedChatId])
-
-  // Initialize sub-chats when chat is selected
-  useEffect(() => {
-    if (selectedChatId) {
-      setChatId(selectedChatId)
-    } else {
-      setChatId(null)
-    }
-  }, [selectedChatId, setChatId])
+    // Navigate to index page (which clears workspace context)
+    workspaceContext?.navigateToNewWorkspace()
+  }, [setSelectedProject, workspaceContext])
 
   // Toggle zen mode: collapse all sidebars for distraction-free focus
   // On exit, open main sidebar only (simple, predictable behavior)
@@ -190,10 +186,29 @@ export function AgentsLayout() {
     }
   }, [isZenMode, setSidebarOpen, setIsZenMode])
 
+  // Navigate to workspace via router
+  const setSelectedChatId = useCallback((id: string | null) => {
+    if (id) {
+      workspaceContext?.navigateToWorkspace(id)
+    } else {
+      workspaceContext?.navigateToNewWorkspace()
+    }
+  }, [workspaceContext])
+
+  // Wrapper for setSidebarOpen that handles function updates
+  const handleSetSidebarOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
+    if (typeof open === "function") {
+      const currentOpen = useUIStore.getState().sidebar.open
+      setSidebarOpen(open(currentOpen))
+    } else {
+      setSidebarOpen(open)
+    }
+  }, [setSidebarOpen])
+
   // Initialize hotkeys manager
   useAgentsHotkeys({
     setSelectedChatId,
-    setSidebarOpen,
+    setSidebarOpen: handleSetSidebarOpen,
     setSettingsDialogOpen: setSettingsOpen,
     setSettingsActiveTab,
     setShortcutsDialogOpen: setShortcutsOpen,
@@ -220,7 +235,8 @@ export function AgentsLayout() {
         <ResizableSidebar
           isOpen={!isMobile && sidebarOpen}
           onClose={handleCloseSidebar}
-          widthAtom={agentsSidebarWidthAtom}
+          width={sidebarWidth}
+          setWidth={setSidebarWidth}
           minWidth={SIDEBAR_MIN_WIDTH}
           maxWidth={SIDEBAR_MAX_WIDTH}
           side="left"

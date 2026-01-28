@@ -1,5 +1,4 @@
 import { memo, useState, useMemo, useEffect } from "react"
-import { useAtom } from "jotai"
 import { TextShimmer } from "../../components/ui/text-shimmer"
 import {
   IconSpinner,
@@ -14,13 +13,7 @@ import { getToolStatus } from "./agent-tool-registry"
 import { cn } from "../../lib/utils"
 import { Circle } from "lucide-react"
 import { AgentToolCall } from "./agent-tool-call"
-import { currentTodosAtomFamily } from "../../lib/atoms"
-
-interface TodoItem {
-  content: string
-  status: "pending" | "in_progress" | "completed"
-  activeForm?: string
-}
+import { useSessionStore, type TodoState, type TodoItem } from "../../stores"
 
 interface AgentTodoToolProps {
   part: {
@@ -168,12 +161,9 @@ export const AgentTodoTool = memo(function AgentTodoTool({
   subChatId,
 }: AgentTodoToolProps) {
   // Synced todos state - scoped per subChatId to prevent cross-chat conflicts
-  // Uses a stable key to ensure proper isolation between different sub-chats
-  const todosAtom = useMemo(
-    () => currentTodosAtomFamily(subChatId || "default"),
-    [subChatId],
-  )
-  const [syncedTodos, setSyncedTodos] = useAtom(todosAtom)
+  const sessionId = subChatId || "default"
+  const syncedTodos = useSessionStore((s) => s.todos[sessionId] ?? { todos: [], creationToolCallId: null })
+  const setSyncedTodos = (newState: TodoState) => useSessionStore.getState().setTodos(sessionId, newState)
 
   // Get todos from input or output.newTodos
   const oldTodos = part.output?.oldTodos || []

@@ -1,9 +1,8 @@
 import { useEffect, useMemo } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { createPortal } from "react-dom"
-import { useAtomValue } from "jotai"
 import { CmdIcon } from "../../icons"
-import { ctrlTabTargetAtom } from "../../lib/atoms"
+import { useUIStore } from "../../stores"
 
 interface AgentsShortcutsDialogProps {
   isOpen: boolean
@@ -72,7 +71,7 @@ const GENERAL_SHORTCUTS: Shortcut[] = [
 
 // Dynamic shortcuts based on ctrlTabTarget preference
 function getWorkspaceShortcuts(
-  ctrlTabTarget: "workspaces" | "agents",
+  ctrlTabTarget: "workspaces" | "sessions",
 ): Shortcut[] {
   return [
     { label: "New workspace", keys: ["cmd", "N"] },
@@ -87,7 +86,7 @@ function getWorkspaceShortcuts(
 }
 
 function getAgentShortcuts(
-  ctrlTabTarget: "workspaces" | "agents",
+  ctrlTabTarget: "workspaces" | "sessions",
 ): Shortcut[] {
   return [
     // Creation & Management (mirrors Workspaces order)
@@ -121,7 +120,7 @@ export function AgentsShortcutsDialog({
   isOpen,
   onClose,
 }: AgentsShortcutsDialogProps) {
-  const ctrlTabTarget = useAtomValue(ctrlTabTargetAtom)
+  const ctrlTabTarget = useUIStore((s) => s.preferences.ctrlTabTarget)
 
   // Memoize shortcuts based on preference
   const workspaceShortcuts = useMemo(

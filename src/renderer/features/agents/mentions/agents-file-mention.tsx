@@ -16,10 +16,9 @@ import {
 } from "react"
 import { flushSync } from "react-dom"
 import { createRoot } from "react-dom/client"
-import { useAtomValue } from "jotai"
 import type { FileMentionOption } from "./agents-mentions-editor"
 import { MENTION_PREFIXES } from "./agents-mentions-editor"
-import { sessionInfoAtom } from "../../../lib/atoms"
+import { useUIStore } from "../../../stores"
 import {
   FilesIcon,
   IconSpinner,
@@ -683,8 +682,8 @@ export const AgentsFileMention = memo(function AgentsFileMention({
 
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
 
-  // Get session info (MCP servers, tools) from atom
-  const sessionInfo = useAtomValue(sessionInfoAtom)
+  // Get session info (MCP servers, tools) from Zustand store
+  const sessionInfo = useUIStore((s) => s.sessionInfo)
 
   // Fetch skills from filesystem (cached for 5 minutes)
   const { data: skills = [], isFetching: isFetchingSkills } = trpc.skills.listEnabled.useQuery(undefined, {
